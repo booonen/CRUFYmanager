@@ -328,17 +328,34 @@ function deleteExternal(id) {
 }
 
 /* ===========================================================================
- * HISTORY BOOK — paginated browser of every committed event
+ * HISTORY BOOK — three sub-tabs: ledger, past seasons (per league),
+ *   and all-time records.
  * ========================================================================= */
 function renderHistoryBook() {
   const root = document.getElementById('history-content');
   if (!root) return;
-  const ents = state.history.slice().reverse();
-  if (!ents.length) { root.innerHTML = emptyState({ icon: '❒', title: 'Empty', body: 'No committed events yet. Play and commit some matches.' }); return; }
+  if (!state.history.length) { root.innerHTML = emptyState({ icon: '❒', title: 'Empty', body: 'No committed events yet. Play and commit some matches.' }); return; }
+  state._historyTab = state._historyTab || 'ledger';
+  let html = `<div class="htabs">
+    <div class="htab ${state._historyTab === 'ledger' ? 'active' : ''}" onclick="setHistoryTab('ledger')">Ledger</div>
+    <div class="htab ${state._historyTab === 'seasons' ? 'active' : ''}" onclick="setHistoryTab('seasons')">Past seasons</div>
+    <div class="htab ${state._historyTab === 'records' ? 'active' : ''}" onclick="setHistoryTab('records')">All-time records</div>
+    <div class="htab ${state._historyTab === 'transfers' ? 'active' : ''}" onclick="setHistoryTab('transfers')">Transfers</div>
+  </div>`;
+  if (state._historyTab === 'ledger') html += renderHistoryLedgerHTML();
+  else if (state._historyTab === 'seasons') html += renderHistorySeasonsHTML();
+  else if (state._historyTab === 'records') html += renderHistoryRecordsHTML();
+  else if (state._historyTab === 'transfers') html += renderHistoryTransfersHTML();
+  root.innerHTML = html;
+}
+
+function setHistoryTab(tab) { state._historyTab = tab; renderHistoryBook(); }
+
+function renderHistoryLedgerHTML() {
   state._historyFilter = state._historyFilter || { type: 'all', season: 'all', includeStruck: false };
   const f = state._historyFilter;
   const types = Array.from(new Set(state.history.map(e => e.type)));
-  const seasons = Array.from(new Set(state.history.map(e => e.season))).sort((a,b) => b - a);
+  const seasons = Array.from(new Set(state.history.map(e => e.season))).sort((a, b) => b - a);
 
   let html = `<div class="card mb-16">
     <div class="form-row-3">
@@ -349,7 +366,7 @@ function renderHistoryBook() {
     <button class="btn" onclick="applyHistoryFilter()">Apply</button>
   </div>`;
 
-  let filtered = ents;
+  let filtered = state.history.slice().reverse();
   if (f.type !== 'all') filtered = filtered.filter(e => e.type === f.type);
   if (f.season !== 'all') filtered = filtered.filter(e => String(e.season) === f.season);
   if (!f.includeStruck) filtered = filtered.filter(e => !e.struck);
@@ -371,8 +388,86 @@ function renderHistoryBook() {
     </div>`;
   }
   if (filtered.length > 200) html += `<p class="text-muted" style="margin-top:8px">Showing first 200. Filter further to see older entries.</p>`;
+  return html;
+}
 
-  root.innerHTML = html;
+function renderHistorySeasonsHTML() {
+  const leagues = state.leagues.slice().sort((a, b) => (a.tier || 99) - (b.tier || 99));
+  if (!leagues.length) return `<div class="empty-state"><p>No leagues yet.</p></div>`;
+  let html = '';
+  for (const lg of leagues) {
+    const titles = leagueSeasonHistory(lg.id);
+    if (!titles.length) continue;
+    html += `<h3 style="margin-top:18px;font-family:var(--font-display)">${esc(lg.name)}</h3>`;
+    html += renderLeagueHistoryHTML(lg.id);
+  }
+  // Cup history
+  for (const cp of state.cups) {
+    const wins = cupHistory(cp.id);
+    if (!wins.length) continue;
+    html += `<h3 style="margin-top:18px;font-family:var(--font-display)">${esc(cp.name)}</h3>`;
+    html += `<table class="data-table"><thead><tr><th class="num-c">Season</th><th>Winner</th><th>Runner-up</th></tr></thead><tbody>`;
+    for (const w of wins) html += `<tr><td class="num-c">${w.season}</td><td><strong>${clubLink(w.winnerId)}</strong> 🏆</td><td>${clubLink(w.runnerUpId)}</td></tr>`;
+    html += `</tbody></table>`;
+  }
+  if (!html) return `<div class="empty-state"><p>No completed seasons yet.</p></div>`;
+  return html;
+}
+
+function renderHistoryRecordsHTML() {
+  let html = '<div class="two-col">';
+  // All-time top scorers
+  html += `<div><div class="card mb-16"><h3>All-time top scorers</h3>`;
+  const ts = allTimeTopScorers(25);
+  if (!ts.length) html += '<p class="text-muted">No goals committed yet.</p>';
+  else {
+    html += `<table class="data-table"><thead><tr><th class="num-c">#</th><th>Player</th><th>Club</th><th class="num-c">Goals</th></tr></thead><tbody>`;
+    ts.forEach((r, i) => {
+      const p = getPlayer(r.playerId);
+      html += `<tr><td class="num-c">${i + 1}</td><td>${p ? playerLink(p.id) : '?'}</td><td>${p ? clubLink(p.clubId) : '?'}</td><td class="num-c"><strong>${r.goals}</strong></td></tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  html += `</div>`;
+
+  // All-time apps
+  html += `<div class="card"><h3>Most appearances</h3>`;
+  const apps = allTimeAppearances(25);
+  if (!apps.length) html += '<p class="text-muted">No appearances yet.</p>';
+  else {
+    html += `<table class="data-table"><thead><tr><th class="num-c">#</th><th>Player</th><th>Club</th><th class="num-c">Apps</th></tr></thead><tbody>`;
+    apps.forEach((r, i) => {
+      const p = getPlayer(r.playerId);
+      html += `<tr><td class="num-c">${i + 1}</td><td>${p ? playerLink(p.id) : '?'}</td><td>${p ? clubLink(p.clubId) : '?'}</td><td class="num-c"><strong>${r.apps}</strong></td></tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  html += `</div></div>`;
+
+  // Most-titled clubs
+  html += `<div><div class="card mb-16"><h3>Most-titled clubs</h3>`;
+  const titles = allTimeTitleHolders(15);
+  if (!titles.length) html += '<p class="text-muted">No titles yet.</p>';
+  else {
+    html += `<table class="data-table"><thead><tr><th class="num-c">#</th><th>Club</th><th class="num-c">Titles</th></tr></thead><tbody>`;
+    titles.forEach((r, i) => html += `<tr><td class="num-c">${i + 1}</td><td>${clubLink(r.clubId)}</td><td class="num-c"><strong>${r.titles}</strong></td></tr>`);
+    html += `</tbody></table>`;
+  }
+  html += `</div></div></div>`;
+  return html;
+}
+
+function renderHistoryTransfersHTML() {
+  const transfers = state.history.filter(e => e.type === 'player_signed' && !e.struck).sort((a, b) => b.ts - a.ts);
+  if (!transfers.length) return `<div class="empty-state"><p>No transfers logged yet. Use the Transfer button on a player's page.</p></div>`;
+  let html = `<table class="data-table"><thead><tr><th class="num-c">Season</th><th>Player</th><th>From</th><th>To</th><th class="num-c">Fee</th></tr></thead><tbody>`;
+  for (const t of transfers.slice(0, 200)) {
+    const fee = t.freeTransfer ? '<span class="text-muted">free</span>' : (t.fee ? t.fee.toLocaleString() : '—');
+    html += `<tr><td class="num-c">${t.season}</td><td>${playerLink(t.playerId)}</td><td>${t.fromClubId ? clubLink(t.fromClubId) : '<span class="text-muted">debut</span>'}</td><td>${t.toClubId ? clubLink(t.toClubId) : '<span class="text-muted">released</span>'}</td><td class="num-c">${fee}</td></tr>`;
+  }
+  html += `</tbody></table>`;
+  if (transfers.length > 200) html += `<p class="text-muted" style="margin-top:6px;font-size:11px">Showing first 200 of ${transfers.length}.</p>`;
+  return html;
 }
 
 function applyHistoryFilter() {
@@ -400,6 +495,10 @@ function describeHistoryEntry(e) {
     case 'player_injured': return `${playerLink(e.playerId)} — injured for ${e.matches} match(es)`;
     case 'player_suspended': return `${playerLink(e.playerId)} — suspended for ${e.games} game(s)${e.reason ? ` (${esc(e.reason)})` : ''}`;
     case 'youth_intake': return `${clubLink(e.clubId)} youth intake (${(e.playerIds || []).length} players)`;
+    case 'player_signed': {
+      const fee = e.freeTransfer ? 'free' : (e.fee ? e.fee.toLocaleString() : '?');
+      return `${playerLink(e.playerId)}: ${e.fromClubId ? clubLink(e.fromClubId) : 'free agent'} → ${e.toClubId ? clubLink(e.toClubId) : 'released'} <span class="text-muted">(${fee})</span>`;
+    }
     case 'nt_callup': return `${playerLink(e.playerId)} called up to ${esc(e.nation || '?')}`;
     case 'note': return esc(e.text || '');
     default: return esc(e.type);
@@ -424,6 +523,15 @@ function renderSettings() {
     </div>
     ${formGroup('Default nationality (name bank for new players/managers)', formSelect('set-default-bank', state.settings.defaultNameBank, Object.keys(state.nameBanks)))}
     <button class="btn btn-primary" onclick="saveNationSettings()">Save identity</button>
+  </div>`;
+
+  // Storage / compaction
+  html += `<div class="card mb-16"><h3>Storage</h3>
+    <p class="text-muted">Older saves can store verbose match-by-match commentary. Compacting strips that and keeps only the slim record (scorers, cards, stats). Match reports stay viewable — commentary is regenerated on the fly.</p>
+    <div class="flex gap-8 flex-wrap">
+      <button class="btn" onclick="(()=>{ const n = compactSaveNow(); refreshAll(); showToast('Compacted ' + n + ' historic match records', n ? 'success' : 'warning'); })()">⚙ Compact save now</button>
+      <button class="btn" onclick="alert('Approximate save size: ' + Math.round((JSON.stringify(state).length || 0) / 1024) + ' KB. Browser localStorage caps are typically 5–10 MB.')">📊 Save size</button>
+    </div>
   </div>`;
 
   // Engine settings

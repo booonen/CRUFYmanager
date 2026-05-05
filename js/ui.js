@@ -290,9 +290,10 @@ function viewMatchModal(matchOrEventId, opts = {}) {
   body += `<div class="match-stats-row"><div class="stat-h">${st.foulsH ?? '-'}</div><div class="stat-l">Fouls</div><div class="stat-a">${st.foulsA ?? '-'}</div></div>`;
   body += `<div class="match-stats-row"><div class="stat-h">${st.yellowsH ?? 0} ▪ / ${st.redsH ?? 0} ■</div><div class="stat-l">Cards</div><div class="stat-a">${st.yellowsA ?? 0} ▪ / ${st.redsA ?? 0} ■</div></div>`;
 
-  // Commentary log
+  // Commentary log — reconstruct from slim data if `events` is missing
+  const events = (m.events && m.events.length) ? m.events : reconstructMatchEvents(m);
   body += `<div class="commentary-log">`;
-  for (const ev of (m.events || [])) {
+  for (const ev of events) {
     const cls = `ce-${ev.type}`;
     const minLabel = ev.minute > 90 ? `90+${ev.minute - 90}'` : `${ev.minute}'`;
     body += `<div class="commentary-event ${cls}"><div class="ce-min">${minLabel}</div><div class="ce-icon">${ev.icon || ''}</div><div class="ce-text">${esc(ev.text || '')}</div></div>`;
@@ -363,4 +364,65 @@ function nextLeagueForMatchday() {
     if (nextMatchdayForLeague(lg.id)) return lg;
   }
   return null;
+}
+
+/* ===========================================================================
+ * reconstructMatchEvents — synthesize a commentary timeline from slim
+ *   committed-match data. Used for viewing historic matches whose verbose
+ *   `events` array was stripped at commit time to save localStorage space.
+ * ========================================================================= */
+function reconstructMatchEvents(m) {
+  if (!m) return [];
+  const home = getClub(m.homeId);
+  const away = getClub(m.awayId);
+  const homeName = home?.name || '?';
+  const awayName = away?.name || '?';
+  const out = [];
+  out.push({ minute: 0, type: 'kickoff', icon: '', text: templ(pick(COMMENTARY.kickoff), { hometeam: homeName, awayteam: awayName, stadium: home?.stadiumName || '?', attendance: '—' }) });
+
+  // Goals
+  for (const sc of (m.scorers || [])) {
+    const scorer = getPlayer(sc.playerId);
+    const assister = sc.assistId ? getPlayer(sc.assistId) : null;
+    let text;
+    if (sc.penalty) text = templ(pick(COMMENTARY.penaltyScored), { scorer: scorer?.name || '?' });
+    else if (sc.ownGoal) text = `${scorer?.name || '?'} turns the ball into his own net.`;
+    else if (assister) text = templ(pick(COMMENTARY.goalAssist), { scorer: scorer?.name || '?', assister: assister.name });
+    else text = templ(pick(COMMENTARY.goal), { scorer: scorer?.name || '?' });
+    out.push({ minute: sc.minute, type: sc.penalty ? 'penalty' : 'goal', side: sc.side, icon: '⚽', text });
+  }
+  // Cards
+  for (const c of (m.cards || [])) {
+    const player = getPlayer(c.playerId);
+    if (c.type === 'yellow') {
+      out.push({ minute: c.minute, type: 'yellow', side: c.side, icon: '▪', text: templ(pick(COMMENTARY.yellow), { fouler: player?.name || '?', fouled: 'an opponent' }) });
+    } else if (c.type === 'red') {
+      out.push({ minute: c.minute, type: 'red', side: c.side, icon: '■', text: templ(pick(COMMENTARY.red), { fouler: player?.name || '?', fouled: 'an opponent' }) });
+    }
+  }
+  // Injuries
+  for (const inj of (m.injuries || [])) {
+    const player = getPlayer(inj.playerId);
+    out.push({ minute: inj.minute, type: 'injury', side: inj.side, icon: '✚', text: templ(pick(COMMENTARY.injury), { player: player?.name || '?' }) });
+  }
+  // Subs
+  for (const s of (m.subs || [])) {
+    const off = getPlayer(s.offId);
+    const on = getPlayer(s.onId);
+    out.push({ minute: s.minute, type: 'sub', side: s.side, icon: '⇄', text: templ(pick(COMMENTARY.sub), { team: s.side === 'home' ? homeName : awayName, playerOff: off?.name || '?', playerOn: on?.name || '?' }) });
+  }
+
+  out.sort((a, b) => a.minute - b.minute || (a.type === 'kickoff' ? -1 : 1));
+  // Insert halftime + fulltime markers at correct positions
+  // Compute scores at HT
+  let hAtHT = 0, aAtHT = 0;
+  for (const sc of (m.scorers || [])) if (sc.minute <= 45) { if (sc.side === 'home') hAtHT++; else aAtHT++; }
+  out.push({ minute: 45, type: 'halftime', icon: '', text: templ(pick(COMMENTARY.halftime), { hometeam: homeName, awayteam: awayName, hs: hAtHT, as: aAtHT }) });
+  const ftMin = 90 + (m.stoppage || 0);
+  out.push({ minute: ftMin, type: 'fulltime', icon: '', text: templ(pick(COMMENTARY.fulltime), { hometeam: homeName, awayteam: awayName, hs: m.hScore, as: m.aScore }) });
+  if (m.penalties) {
+    out.push({ minute: 121, type: 'penalties', icon: '', text: `Penalty shootout: ${homeName} ${m.penalties.homeKicks} – ${m.penalties.awayKicks} ${awayName}` });
+  }
+  out.sort((a, b) => a.minute - b.minute);
+  return out;
 }

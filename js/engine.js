@@ -444,18 +444,18 @@ function simulateMatch({ homeId, awayId, leagueId = null, cupId = null, matchday
   const awayAttack = awayS.attack * (0.85 + at.mentality / 200) + awayS.midfield * 0.3;
   const awayDef    = awayS.defence + awayS.gk * 0.6 + (awayS.midfield * 0.2) + (100 - at.mentality) * 0.05;
 
-  // Expected goals: ratio attack/(attack+defence) scaled to ~1.4 average per side
+  // Expected goals: ratio attack/(attack+defence) scaled to ~1.3 average per side
   const ratioH = homeAttack / Math.max(homeAttack + awayDef, 1);
   const ratioA = awayAttack / Math.max(awayAttack + homeDef, 1);
-  let xgH = 1.0 + ratioH * 2.4;
-  let xgA = 1.0 + ratioA * 2.0;
-  // Tempo: higher tempo = more shots both ways
+  let xgH = 0.5 + ratioH * 1.5;
+  let xgA = 0.5 + ratioA * 1.3;
+  // Tempo: higher tempo = slightly more shots both ways
   const avgTempo = (ht.tempo + at.tempo) / 2;
-  const tempoMult = 0.85 + avgTempo / 200;
+  const tempoMult = 0.95 + avgTempo / 400;
   xgH *= tempoMult; xgA *= tempoMult;
   // Tiny noise
-  xgH *= 0.85 + rand() * 0.3;
-  xgA *= 0.85 + rand() * 0.3;
+  xgH *= 0.9 + rand() * 0.2;
+  xgA *= 0.9 + rand() * 0.2;
 
   // ===== Tick loop =====
   const events = [];
@@ -486,9 +486,9 @@ function simulateMatch({ homeId, awayId, leagueId = null, cupId = null, matchday
   events.push({ minute: 0, type: 'kickoff', text: templ(pick(COMMENTARY.kickoff), { hometeam: homeTeamLabel, awayteam: awayTeamLabel, stadium: home.stadiumName, attendance: pickInt(Math.round(home.stadiumCapacity * 0.55), home.stadiumCapacity).toLocaleString() }) });
 
   // Per-minute event probabilities
-  const SHOT_RATE = 0.06 + avgTempo / 1000;     // ~6-10 shots per side
+  const SHOT_RATE = 0.05 + avgTempo / 1300;     // ~6-8 shots per side
   const FOUL_RATE = 0.04 + (ht.pressing + at.pressing) / 2000; // ~4-8 fouls
-  const INJURY_RATE = 0.0035;
+  const INJURY_RATE = 0.0028;
 
   const initialPlayers = (side, xi) => xi.slots.map(s => s.playerId).filter(Boolean);
   const homePlayers = initialPlayers('home', homeXI);
@@ -517,8 +517,7 @@ function simulateMatch({ homeId, awayId, leagueId = null, cupId = null, matchday
     for (const side of ['home', 'away']) {
       const opp = side === 'home' ? 'away' : 'home';
       const myXg = side === 'home' ? xgH : xgA;
-      const oppXg = opp === 'home' ? xgH : xgA;
-      const sideShotRate = SHOT_RATE * (myXg / 1.5);
+      const sideShotRate = SHOT_RATE * (myXg / 1.4);
       if (rand() < sideShotRate) {
         rollShot(side, min);
       }
@@ -600,8 +599,8 @@ function simulateMatch({ homeId, awayId, leagueId = null, cupId = null, matchday
     const shotQuality = (shooter.attrs.shooting + shooter.attrs.technique) / 2 + randNorm(0, 12);
     const gkQuality = oppGK ? oppGK.attrs.goalkeeping + randNorm(0, 8) : 50;
 
-    // Penalty? small chance
-    const isPen = rand() < 0.06;
+    // Penalty? small chance (~1 every 4 matches)
+    const isPen = rand() < 0.012;
     if (isPen) {
       events.push({ minute: min, type: 'penalty', icon: '⚽', side, text: pick(COMMENTARY.penaltyAwarded) });
       const conv = (shotQuality - gkQuality * 0.6 + 30) / 100;
@@ -616,7 +615,7 @@ function simulateMatch({ homeId, awayId, leagueId = null, cupId = null, matchday
     }
 
     // Open play
-    const goalP = clamp((shotQuality - gkQuality * 0.5 + 8) / 130, 0.04, 0.32);
+    const goalP = clamp((shotQuality - gkQuality * 0.55 + 8) / 145, 0.035, 0.26);
     const blockP = 0.18;
     const saveP = 0.30;
     const r = rand();
@@ -933,7 +932,8 @@ function commitMatch(draft) {
     if (cp) markCupFixturePlayed(cp, draft);
   }
 
-  // History entry — store the full match record
+  // History entry — slim form. Events / XI omitted to keep localStorage small;
+  // they are reconstructed from scorers/cards/subs/injuries on view.
   historyAppend('match_committed', {
     matchId: draft.id,
     leagueId: draft.leagueId,
@@ -941,6 +941,8 @@ function commitMatch(draft) {
     matchday: draft.matchday,
     homeId: draft.homeId,
     awayId: draft.awayId,
+    homeFormation: (draft.homeXI && draft.homeXI.formation) || null,
+    awayFormation: (draft.awayXI && draft.awayXI.formation) || null,
     hScore: draft.hScore,
     aScore: draft.aScore,
     extraTime: draft.extraTime,
@@ -951,7 +953,6 @@ function commitMatch(draft) {
     subs: draft.subs,
     appearances: draft.appearances,
     stats: draft.stats,
-    events: draft.events,
     stoppage: draft.stoppage,
   });
 
@@ -1160,14 +1161,18 @@ function endOfSeasonProcessing() {
     const ts = topScorersForLeague(lg.id);
     const top = ts[0] ? { playerId: ts[0].playerId, goals: ts[0].goals } : null;
     const numPromoted = lg.rules?.promoted ?? 0;
+    const numPlayoffUp = lg.rules?.playoffPromoted ?? 0;
     const numRelegated = lg.rules?.relegated ?? 0;
+    const numPlayoffDown = lg.rules?.playoffRelegated ?? 0;
     const promoted = table.slice(0, numPromoted).map(r => r.clubId);
+    const playoffPromoted = numPlayoffUp ? table.slice(numPromoted, numPromoted + numPlayoffUp).map(r => r.clubId) : [];
     const relegated = numRelegated ? table.slice(-numRelegated).map(r => r.clubId) : [];
+    const playoffRelegated = numPlayoffDown ? table.slice(-(numRelegated + numPlayoffDown), -numRelegated || undefined).map(r => r.clubId) : [];
     promotedClubsByLeague[lg.id] = promoted;
     relegatedClubsByLeague[lg.id] = relegated;
     historyAppend('season_ended', {
       leagueId: lg.id, championId: champion, finalTable: table.map(r => ({ clubId: r.clubId, p: r.p, w: r.w, d: r.d, l: r.l, gf: r.gf, ga: r.ga, gd: r.gd, pts: r.pts })),
-      topScorer: top, promoted, relegated
+      topScorer: top, promoted, relegated, playoffPromoted, playoffRelegated
     });
     lg.status = 'completed';
   }
@@ -1333,6 +1338,40 @@ function sackManager(clubId, reason) {
   mgr.isUnemployed = true;
   mgr.seasonsAtClub = 0;
   club.managerId = null;
+}
+
+/* ===========================================================================
+ * Transfers — manual move of a player to a new club
+ * ========================================================================= */
+function transferPlayer(playerId, toClubId, fee = 0, freeTransfer = false) {
+  const p = getPlayer(playerId);
+  if (!p) return false;
+  const fromClubId = p.clubId;
+  // Free up captain/vice-captain references on the old club
+  if (fromClubId) {
+    const oldClub = getClub(fromClubId);
+    if (oldClub) {
+      if (oldClub.captainId === p.id) oldClub.captainId = null;
+      if (oldClub.viceCaptainId === p.id) oldClub.viceCaptainId = null;
+    }
+  }
+  p.clubId = toClubId || null;
+  // Pick a free shirt number for the new club
+  if (toClubId) {
+    p.shirtNumber = nextFreeShirtNumber(toClubId);
+  } else {
+    p.shirtNumber = null;
+  }
+  historyAppend('player_signed', {
+    playerId,
+    fromClubId: fromClubId || null,
+    toClubId: toClubId || null,
+    fee: freeTransfer ? 0 : fee,
+    freeTransfer: !!freeTransfer || !fromClubId,
+    season: state.settings.season
+  });
+  saveState();
+  return true;
 }
 
 function hireManagerForClub(clubId) {

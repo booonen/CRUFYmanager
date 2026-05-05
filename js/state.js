@@ -95,7 +95,31 @@ function migrateState(parsed) {
     }
   }
   fresh.version = SCHEMA_VERSION;
+  // Compact any bloated old match records — strip events / XI in place
+  if (Array.isArray(fresh.history)) {
+    let slimmed = 0;
+    for (const e of fresh.history) {
+      if (e.type !== 'match_committed') continue;
+      if (e.events) { delete e.events; slimmed++; }
+      if (e.homeXI) { e.homeFormation = e.homeFormation || (e.homeXI.formation || null); delete e.homeXI; }
+      if (e.awayXI) { e.awayFormation = e.awayFormation || (e.awayXI.formation || null); delete e.awayXI; }
+    }
+    if (slimmed) console.log(`Compacted ${slimmed} historic match records on load.`);
+  }
   return fresh;
+}
+
+/* User-triggered compactor — same logic, callable from Settings. */
+function compactSaveNow() {
+  let slimmed = 0;
+  for (const e of state.history) {
+    if (e.type !== 'match_committed') continue;
+    if (e.events) { delete e.events; slimmed++; }
+    if (e.homeXI) { e.homeFormation = e.homeFormation || (e.homeXI.formation || null); delete e.homeXI; }
+    if (e.awayXI) { e.awayFormation = e.awayFormation || (e.awayXI.formation || null); delete e.awayXI; }
+  }
+  saveStateNow();
+  return slimmed;
 }
 
 function saveState() {
@@ -471,4 +495,115 @@ function showToast(msg, type = 'success') {
     el.style.transform = 'translateX(20px)';
     setTimeout(() => el.remove(), 220);
   }, 3200);
+}
+
+/* ===========================================================================
+ * Encyclopedic-view helpers
+ * ========================================================================= */
+
+/* Head-to-head record between two clubs across all committed history.
+ * Returns { p, w, d, l, gf, ga, matches: [{...}] } from clubA's perspective. */
+function clubHeadToHead(clubAId, clubBId) {
+  const matches = state.history.filter(e =>
+    e.type === 'match_committed' && !e.struck &&
+    ((e.homeId === clubAId && e.awayId === clubBId) ||
+     (e.homeId === clubBId && e.awayId === clubAId))
+  ).sort((a, b) => a.season - b.season || (a.matchday || 0) - (b.matchday || 0));
+  const out = { p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, matches };
+  for (const m of matches) {
+    out.p++;
+    const aIsHome = m.homeId === clubAId;
+    const aGoals = aIsHome ? m.hScore : m.aScore;
+    const bGoals = aIsHome ? m.aScore : m.hScore;
+    out.gf += aGoals; out.ga += bGoals;
+    if (aGoals > bGoals) out.w++;
+    else if (aGoals < bGoals) out.l++;
+    else out.d++;
+  }
+  return out;
+}
+
+/* All committed matches a player appeared in. Each entry includes the
+ * player's stat line for that match. */
+function playerMatchLog(playerId) {
+  const out = [];
+  for (const m of state.history.filter(e => e.type === 'match_committed' && !e.struck)) {
+    const apps = (m.appearances || []).filter(a => a.playerId === playerId);
+    if (!apps.length) continue;
+    const ourSide = apps[0].side;
+    const goals = (m.scorers || []).filter(s => s.playerId === playerId && !s.ownGoal).length;
+    const assists = (m.scorers || []).filter(s => s.assistId === playerId).length;
+    const yellows = (m.cards || []).filter(c => c.playerId === playerId && c.type === 'yellow').length;
+    const reds = (m.cards || []).filter(c => c.playerId === playerId && c.type === 'red').length;
+    const mins = apps.reduce((acc, a) => acc + (a.minutesPlayed || 0), 0);
+    const started = apps.some(a => a.started);
+    out.push({
+      matchId: m.id, season: m.season, matchday: m.matchday,
+      leagueId: m.leagueId, cupId: m.cupId,
+      homeId: m.homeId, awayId: m.awayId, hScore: m.hScore, aScore: m.aScore,
+      ourSide, ourClubId: ourSide === 'home' ? m.homeId : m.awayId,
+      mins, started, goals, assists, yellows, reds
+    });
+  }
+  out.sort((a, b) => b.season - a.season || (b.matchday || 0) - (a.matchday || 0));
+  return out;
+}
+
+/* All season_ended events for a league, newest first. Each contains the full
+ * final table snapshot. */
+function leagueSeasonHistory(leagueId) {
+  return state.history
+    .filter(e => e.type === 'season_ended' && !e.struck && e.leagueId === leagueId)
+    .sort((a, b) => b.season - a.season);
+}
+
+/* Cup history — list of all winners and runners-up. */
+function cupHistory(cupId) {
+  return state.history
+    .filter(e => e.type === 'cup_won' && !e.struck && e.cupId === cupId)
+    .sort((a, b) => b.season - a.season);
+}
+
+/* All-time top scorers across all leagues. Returns flat list. */
+function allTimeTopScorers(limit = 25) {
+  const counts = {};
+  for (const e of state.history) {
+    if (e.type !== 'match_committed' || e.struck) continue;
+    for (const sc of (e.scorers || [])) {
+      if (sc.ownGoal) continue;
+      counts[sc.playerId] = (counts[sc.playerId] || 0) + 1;
+    }
+  }
+  return Object.entries(counts)
+    .map(([playerId, goals]) => ({ playerId, goals }))
+    .sort((a, b) => b.goals - a.goals)
+    .slice(0, limit);
+}
+
+/* All-time appearance leaders */
+function allTimeAppearances(limit = 25) {
+  const counts = {};
+  for (const e of state.history) {
+    if (e.type !== 'match_committed' || e.struck) continue;
+    for (const ap of (e.appearances || [])) {
+      counts[ap.playerId] = (counts[ap.playerId] || 0) + 1;
+    }
+  }
+  return Object.entries(counts)
+    .map(([playerId, apps]) => ({ playerId, apps }))
+    .sort((a, b) => b.apps - a.apps)
+    .slice(0, limit);
+}
+
+/* Most-titled clubs (by league wins) */
+function allTimeTitleHolders(limit = 25) {
+  const counts = {};
+  for (const e of state.history) {
+    if (e.type !== 'season_ended' || e.struck || !e.championId) continue;
+    counts[e.championId] = (counts[e.championId] || 0) + 1;
+  }
+  return Object.entries(counts)
+    .map(([clubId, titles]) => ({ clubId, titles }))
+    .sort((a, b) => b.titles - a.titles)
+    .slice(0, limit);
 }

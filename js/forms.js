@@ -12,21 +12,29 @@ function openLeagueModal(id) {
   const isEdit = !!lg;
   const draft = lg ? deepClone(lg) : {
     id: null, name: '', tier: 1, clubIds: [],
-    rules: { promoted: 0, relegated: 3, playoffsEnabled: false },
+    rules: { promoted: 0, relegated: 3, playoffPromoted: 0, playoffRelegated: 0 },
     pointsSystem: { ...DEFAULT_POINTS_SYSTEM },
     tiebreakers: TIEBREAKERS.slice(),
     schedule: [], status: 'pending', season: state.settings.season
   };
+  // Migrate old shape if needed
+  if (draft.rules && draft.rules.playoffPromoted == null) draft.rules.playoffPromoted = 0;
+  if (draft.rules && draft.rules.playoffRelegated == null) draft.rules.playoffRelegated = 0;
   const allClubOptions = state.clubs.map(c => ({ value: c.id, label: `${c.name}${c.leagueId && c.leagueId !== id ? ' (in ' + (getLeague(c.leagueId)?.name || '?') + ')' : ''}` }));
   const body = `
     <div class="form-row">
       ${formGroup('Name', `<input type="text" id="lg-name" value="${esc(draft.name)}" placeholder="e.g. Premier Division">`)}
       ${formGroup('Tier (1 = top)', `<input type="number" id="lg-tier" value="${draft.tier}" min="1" max="20">`)}
     </div>
-    <div class="form-row-3">
-      ${formGroup('Promoted (top N)', `<input type="number" id="lg-promoted" value="${draft.rules.promoted}" min="0" max="10">`)}
-      ${formGroup('Relegated (bottom N)', `<input type="number" id="lg-relegated" value="${draft.rules.relegated}" min="0" max="10">`)}
-      ${formGroup('Promotion playoffs', `<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="lg-playoffs" ${draft.rules.playoffsEnabled ? 'checked' : ''}> enabled</label>`)}
+    <h4>Promotion (places 1 → N)</h4>
+    <div class="form-row">
+      ${formGroup('Auto-promoted (top N)', `<input type="number" id="lg-promoted" value="${draft.rules.promoted}" min="0" max="10">`, 'These finishers move up automatically each season.')}
+      ${formGroup('Playoff places (next M)', `<input type="number" id="lg-playoff-up" value="${draft.rules.playoffPromoted}" min="0" max="10">`, 'Informational slots — engine highlights these positions; you log playoff results manually.')}
+    </div>
+    <h4>Relegation (places ↓ from bottom)</h4>
+    <div class="form-row">
+      ${formGroup('Auto-relegated (bottom N)', `<input type="number" id="lg-relegated" value="${draft.rules.relegated}" min="0" max="10">`, 'These finishers drop automatically each season.')}
+      ${formGroup('Playoff places (next M up)', `<input type="number" id="lg-playoff-down" value="${draft.rules.playoffRelegated}" min="0" max="10">`, 'Slots above the auto-drop zone that contest a relegation playoff.')}
     </div>
     <div class="form-row-3">
       ${formGroup('Win pts', `<input type="number" id="lg-win" value="${draft.pointsSystem.win}" min="0">`)}
@@ -57,7 +65,8 @@ function saveLeagueFromForm(id) {
     rules: {
       promoted: parseInt(document.getElementById('lg-promoted').value) || 0,
       relegated: parseInt(document.getElementById('lg-relegated').value) || 0,
-      playoffsEnabled: document.getElementById('lg-playoffs').checked
+      playoffPromoted: parseInt(document.getElementById('lg-playoff-up').value) || 0,
+      playoffRelegated: parseInt(document.getElementById('lg-playoff-down').value) || 0,
     },
     pointsSystem: {
       win: parseInt(document.getElementById('lg-win').value) || 3,
@@ -455,6 +464,40 @@ function savePlayerFromForm(id) {
   }
   saveState(); closeModal(); refreshAll();
   showToast('Player saved', 'success');
+}
+
+/* ===========================================================================
+ * TRANSFER form
+ * ========================================================================= */
+function openTransferModal(playerId) {
+  const p = getPlayer(playerId);
+  if (!p) return;
+  const fromClub = p.clubId ? getClub(p.clubId) : null;
+  const otherClubs = state.clubs.filter(c => c.id !== p.clubId);
+  const body = `
+    <p style="margin-bottom:12px">Move <strong>${esc(p.name)}</strong> ${fromClub ? `from <strong>${esc(fromClub.name)}</strong>` : '(currently free agent)'} to a new club.</p>
+    ${formGroup('New club', formSelect('tx-to', '', [{value:'', label:'(release as free agent)'}, ...otherClubs.map(c => ({value: c.id, label: c.name + (c.leagueId ? ` (${getLeague(c.leagueId)?.name || ''})` : '')}))]))}
+    <div class="form-row">
+      ${formGroup('Fee', `<input type="number" id="tx-fee" min="0" value="0" step="100">`)}
+      ${formGroup('Free transfer', `<label style="display:flex;gap:6px;align-items:center;cursor:pointer;padding-top:8px"><input type="checkbox" id="tx-free"> mark as free transfer</label>`)}
+    </div>
+    <p class="form-hint">An entry is appended to the history book either way. Pick "(release)" to send the player to the free-agent pool.</p>
+  `;
+  const footer = `
+    <button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="confirmTransfer('${playerId}')">Move</button>
+  `;
+  openModal({ title: 'Transfer player', body, footer });
+}
+
+function confirmTransfer(playerId) {
+  const toClubId = document.getElementById('tx-to').value || null;
+  const fee = parseInt(document.getElementById('tx-fee').value) || 0;
+  const free = document.getElementById('tx-free').checked;
+  if (transferPlayer(playerId, toClubId, fee, free)) {
+    closeModal(); refreshAll();
+    showToast(toClubId ? `Transferred to ${clubName(toClubId)}` : 'Released as free agent', 'success');
+  }
 }
 
 /* ===========================================================================

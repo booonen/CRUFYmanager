@@ -81,21 +81,28 @@ function renderLeagueTableHTML(leagueId) {
   if (!lg) return '';
   const table = leagueTable(leagueId);
   const promoted = lg.rules?.promoted ?? 0;
+  const playoffUp = lg.rules?.playoffPromoted ?? 0;
   const relegated = lg.rules?.relegated ?? 0;
+  const playoffDown = lg.rules?.playoffRelegated ?? 0;
+  const n = table.length;
   let html = `<table class="league-table">
     <thead><tr><th class="pos">#</th><th>Club</th><th class="num-c">P</th><th class="num-c">W</th><th class="num-c">D</th><th class="num-c">L</th><th class="num-c">GF</th><th class="num-c">GA</th><th class="num-c">GD</th><th class="num-c">Pts</th><th>Form</th></tr></thead><tbody>`;
   table.forEach((r, i) => {
     let posCls = '';
     if (i < promoted) posCls = 'pos-promo';
-    else if (i >= table.length - relegated) posCls = 'pos-relegate';
+    else if (i < promoted + playoffUp) posCls = 'pos-playoff';
+    else if (i >= n - relegated) posCls = 'pos-relegate';
+    else if (i >= n - relegated - playoffDown) posCls = 'pos-playoff';
     const form = r.form.map(f => `<span class="f-${f.toLowerCase()}">${f}</span>`).join('');
     html += `<tr><td class="pos ${posCls}">${i + 1}</td><td>${clubLink(r.clubId)}</td><td class="num-c">${r.p}</td><td class="num-c">${r.w}</td><td class="num-c">${r.d}</td><td class="num-c">${r.l}</td><td class="num-c">${r.gf}</td><td class="num-c">${r.ga}</td><td class="num-c">${r.gd > 0 ? '+' : ''}${r.gd}</td><td class="num-c"><strong>${r.pts}</strong></td><td class="form-cell">${form}</td></tr>`;
   });
   html += `</tbody></table>`;
-  if (promoted || relegated) {
+  if (promoted || relegated || playoffUp || playoffDown) {
     html += `<div class="legend-row">
-      ${promoted ? `<span class="legend-item"><span class="legend-marker" style="background:var(--success)"></span>Promotion (top ${promoted})</span>` : ''}
-      ${relegated ? `<span class="legend-item"><span class="legend-marker" style="background:var(--danger)"></span>Relegation (bottom ${relegated})</span>` : ''}
+      ${promoted ? `<span class="legend-item"><span class="legend-marker" style="background:var(--success)"></span>Auto-promotion (top ${promoted})</span>` : ''}
+      ${playoffUp ? `<span class="legend-item"><span class="legend-marker" style="background:var(--info)"></span>Promotion playoff (next ${playoffUp})</span>` : ''}
+      ${playoffDown ? `<span class="legend-item"><span class="legend-marker" style="background:var(--info)"></span>Relegation playoff (${playoffDown} above drop)</span>` : ''}
+      ${relegated ? `<span class="legend-item"><span class="legend-marker" style="background:var(--danger)"></span>Auto-relegation (bottom ${relegated})</span>` : ''}
     </div>`;
   }
   return html;
@@ -205,13 +212,39 @@ function renderLeagueScorersHTML(leagueId) {
 }
 
 function renderLeagueHistoryHTML(leagueId) {
-  const titles = state.history.filter(e => e.type === 'season_ended' && !e.struck && e.leagueId === leagueId);
+  const titles = leagueSeasonHistory(leagueId);
   if (!titles.length) return `<div class="empty-state"><p>No completed seasons yet.</p></div>`;
-  let html = `<table class="data-table"><thead><tr><th class="num-c">Season</th><th>Champion</th><th>Top scorer</th><th>Promoted</th><th>Relegated</th></tr></thead><tbody>`;
-  for (const t of titles.slice().sort((a, b) => b.season - a.season)) {
+  let html = `<p class="text-muted" style="font-size:12px">Click a season to expand the final table.</p>`;
+  for (const t of titles) {
     const ts = t.topScorer ? `${playerLink(t.topScorer.playerId)} (${t.topScorer.goals})` : '—';
-    html += `<tr><td class="num-c">${t.season}</td><td><strong>${clubLink(t.championId)}</strong></td><td>${ts}</td><td>${(t.promoted || []).map(clubLink).join(', ') || '—'}</td><td>${(t.relegated || []).map(clubLink).join(', ') || '—'}</td></tr>`;
+    html += `<details style="margin-bottom:8px;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px">
+      <summary style="cursor:pointer;font-weight:500;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline">
+        <span><strong>Season ${t.season}</strong> · 🏆 ${clubLink(t.championId)}</span>
+        <span class="text-muted" style="font-size:12px">Top scorer: ${ts}${(t.promoted || []).length ? ` · ↑ ${(t.promoted || []).length}` : ''}${(t.relegated || []).length ? ` · ↓ ${(t.relegated || []).length}` : ''}</span>
+      </summary>
+      <div style="margin-top:10px">
+        ${renderArchivedSeasonTableHTML(t)}
+      </div>
+    </details>`;
   }
+  return html;
+}
+
+function renderArchivedSeasonTableHTML(season) {
+  if (!season.finalTable || !season.finalTable.length) return '<p class="text-muted">No table snapshot stored.</p>';
+  const promoted = season.promoted || [];
+  const playoffUp = season.playoffPromoted || [];
+  const relegated = season.relegated || [];
+  const playoffDown = season.playoffRelegated || [];
+  let html = `<table class="league-table"><thead><tr><th class="pos">#</th><th>Club</th><th class="num-c">P</th><th class="num-c">W</th><th class="num-c">D</th><th class="num-c">L</th><th class="num-c">GF</th><th class="num-c">GA</th><th class="num-c">GD</th><th class="num-c">Pts</th></tr></thead><tbody>`;
+  season.finalTable.forEach((r, i) => {
+    let posCls = '';
+    if (promoted.includes(r.clubId) || r.clubId === season.championId) posCls = 'pos-promo';
+    else if (playoffUp.includes(r.clubId)) posCls = 'pos-playoff';
+    else if (relegated.includes(r.clubId)) posCls = 'pos-relegate';
+    else if (playoffDown.includes(r.clubId)) posCls = 'pos-playoff';
+    html += `<tr><td class="pos ${posCls}">${i + 1}</td><td>${clubLink(r.clubId)}${r.clubId === season.championId ? ' 🏆' : ''}</td><td class="num-c">${r.p}</td><td class="num-c">${r.w}</td><td class="num-c">${r.d}</td><td class="num-c">${r.l}</td><td class="num-c">${r.gf}</td><td class="num-c">${r.ga}</td><td class="num-c">${(r.gd ?? r.gf - r.ga) > 0 ? '+' : ''}${r.gd ?? r.gf - r.ga}</td><td class="num-c"><strong>${r.pts}</strong></td></tr>`;
+  });
   html += `</tbody></table>`;
   return html;
 }
@@ -363,7 +396,8 @@ function renderClubDetailHTML(id) {
         </div>`).join('')}
         ${!squad.length ? '<div class="empty-state"><p>No players in this squad. Use the bulk-create option in Clubs view to populate.</p></div>' : ''}
       </div>
-      <div class="card"><h3>Season-by-season</h3>${renderClubSeasonHistoryHTML(id)}</div>
+      <div class="card mb-16"><h3>Season-by-season</h3>${renderClubSeasonHistoryHTML(id)}</div>
+      <div class="card"><h3>Head-to-head <span class="text-muted" style="font-size:12px;font-weight:400">all-time, sorted by wins</span></h3>${renderClubHeadToHeadHTML(id)}</div>
     </div>
     <div>
       <div class="card mb-16"><h3>Identity</h3>
@@ -389,6 +423,28 @@ function renderClubDetailHTML(id) {
       </div>
     </div>
   </div>`;
+  return html;
+}
+
+function renderClubHeadToHeadHTML(clubId) {
+  const opponents = new Set();
+  for (const e of state.history) {
+    if (e.type !== 'match_committed' || e.struck) continue;
+    if (e.homeId === clubId) opponents.add(e.awayId);
+    else if (e.awayId === clubId) opponents.add(e.homeId);
+  }
+  if (!opponents.size) return '<p class="text-muted" style="font-size:12px">No matches played yet.</p>';
+  const rows = Array.from(opponents).map(oid => {
+    const h2h = clubHeadToHead(clubId, oid);
+    return { oid, ...h2h };
+  });
+  rows.sort((a, b) => b.w - a.w || b.gf - b.ga - (a.gf - a.ga) || a.p - b.p);
+  let html = `<table class="data-table"><thead><tr><th>Opponent</th><th class="num-c">P</th><th class="num-c">W</th><th class="num-c">D</th><th class="num-c">L</th><th class="num-c">GF</th><th class="num-c">GA</th><th class="num-c"></th></tr></thead><tbody>`;
+  for (const r of rows) {
+    const ratio = r.p ? Math.round(r.w / r.p * 100) : 0;
+    html += `<tr><td>${clubLink(r.oid)}</td><td class="num-c">${r.p}</td><td class="num-c text-success">${r.w}</td><td class="num-c text-muted">${r.d}</td><td class="num-c text-danger">${r.l}</td><td class="num-c">${r.gf}</td><td class="num-c">${r.ga}</td><td class="num-c"><span class="text-muted" style="font-size:11px">${ratio}%</span></td></tr>`;
+  }
+  html += `</tbody></table>`;
   return html;
 }
 
@@ -464,7 +520,10 @@ function renderPlayerDetailHTML(id) {
   html += `<div class="page-header">
     <div><h1>${esc(p.name)} ${positionBadge(p.position)}</h1>
     <div class="subtitle">${esc(p.role)} · ${esc((p.nationality || '').replace('Generic ',''))} · age ${p.age}${p.isRetired ? ' · retired' : ''} · ${club ? clubLink(club.id) : 'free agent'}</div></div>
-    <div class="flex gap-8"><button class="btn btn-primary" onclick="openPlayerModal('${p.id}')">Edit</button></div>
+    <div class="flex gap-8">
+      ${!p.isRetired ? `<button class="btn" onclick="openTransferModal('${p.id}')">⇄ Transfer</button>` : ''}
+      <button class="btn btn-primary" onclick="openPlayerModal('${p.id}')">Edit</button>
+    </div>
   </div>`;
   html += `<div class="two-col">
     <div>
@@ -481,7 +540,9 @@ function renderPlayerDetailHTML(id) {
         ${attrBar('Potential', p.potential)}
         ${attrBar('Injury proneness', p.injuryProneness)}
       </div>
-      <div class="card"><h3>Career history</h3>${renderPlayerCareerHTML(id, career)}</div>
+      <div class="card mb-16"><h3>Career by season</h3>${renderPlayerCareerHTML(id, career)}</div>
+      <div class="card mb-16"><h3>Match log <span class="text-muted" style="font-size:12px;font-weight:400">most recent first</span></h3>${renderPlayerMatchLogHTML(id)}</div>
+      <div class="card"><h3>Transfers</h3>${renderPlayerTransfersHTML(id)}</div>
     </div>
     <div>
       <div class="card mb-16"><h3>Status</h3>
@@ -517,6 +578,36 @@ function renderPlayerCareerHTML(playerId, career) {
   let html = `<table class="data-table"><thead><tr><th class="num-c">Season</th><th>Club</th><th class="num-c">Apps</th><th class="num-c">Mins</th><th class="num-c">G</th><th class="num-c">A</th><th class="num-c">Y/R</th></tr></thead><tbody>`;
   for (const [season, s] of seasons) {
     html += `<tr><td class="num-c">${season}</td><td>${clubLink(s.clubId)}</td><td class="num-c">${s.apps}</td><td class="num-c">${s.mins}</td><td class="num-c">${s.goals}</td><td class="num-c">${s.assists}</td><td class="num-c">${s.yellows}/${s.reds}</td></tr>`;
+  }
+  html += `</tbody></table>`;
+  return html;
+}
+
+function renderPlayerMatchLogHTML(playerId) {
+  const log = playerMatchLog(playerId);
+  if (!log.length) return '<p class="text-muted" style="font-size:12px">No appearances yet.</p>';
+  let html = `<table class="data-table"><thead><tr><th class="num-c">S</th><th>Comp.</th><th>Match</th><th class="num-c">Mins</th><th class="num-c">G</th><th class="num-c">A</th><th class="num-c">Y/R</th></tr></thead><tbody>`;
+  for (const r of log.slice(0, 200)) {
+    const home = clubName(r.homeId);
+    const away = clubName(r.awayId);
+    const ourGoals = r.ourSide === 'home' ? r.hScore : r.aScore;
+    const oppGoals = r.ourSide === 'home' ? r.aScore : r.hScore;
+    const resCls = ourGoals > oppGoals ? 'text-success' : ourGoals < oppGoals ? 'text-danger' : 'text-muted';
+    const comp = r.leagueId ? `${esc(getLeague(r.leagueId)?.name || '?').slice(0, 12)}${r.matchday ? ` MD${r.matchday}` : ''}` : (r.cupId ? esc(getCup(r.cupId)?.name || '?').slice(0, 16) : '—');
+    html += `<tr onclick="viewMatchModal('${r.matchId}')" style="cursor:pointer"><td class="num-c">${r.season}</td><td>${comp}</td><td><span class="${resCls}">${esc(home)} ${r.hScore}–${r.aScore} ${esc(away)}</span></td><td class="num-c">${r.mins}</td><td class="num-c">${r.goals || '—'}</td><td class="num-c">${r.assists || '—'}</td><td class="num-c">${r.yellows || '—'}/${r.reds || '—'}</td></tr>`;
+  }
+  html += `</tbody></table>`;
+  if (log.length > 200) html += `<p class="text-muted" style="margin-top:6px;font-size:11px">Showing 200 of ${log.length} matches.</p>`;
+  return html;
+}
+
+function renderPlayerTransfersHTML(playerId) {
+  const transfers = state.history.filter(e => e.type === 'player_signed' && !e.struck && e.playerId === playerId).sort((a, b) => b.ts - a.ts);
+  if (!transfers.length) return '<p class="text-muted" style="font-size:12px">No transfers logged.</p>';
+  let html = `<table class="data-table"><thead><tr><th class="num-c">Season</th><th>From</th><th>To</th><th class="num-c">Fee</th></tr></thead><tbody>`;
+  for (const t of transfers) {
+    const fee = t.freeTransfer ? '<span class="text-muted">free</span>' : (t.fee ? t.fee.toLocaleString() : '—');
+    html += `<tr><td class="num-c">${t.season}</td><td>${t.fromClubId ? clubLink(t.fromClubId) : '<span class="text-muted">debut</span>'}</td><td>${t.toClubId ? clubLink(t.toClubId) : '<span class="text-muted">released</span>'}</td><td class="num-c">${fee}</td></tr>`;
   }
   html += `</tbody></table>`;
   return html;
