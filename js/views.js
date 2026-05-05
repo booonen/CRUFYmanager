@@ -356,10 +356,15 @@ function renderClubs() {
     list.innerHTML = emptyState({ icon: '⚐', title: state.clubs.length ? 'No clubs match' : 'No clubs', body: state.clubs.length ? 'Adjust the search.' : 'Add one or use bulk-create.', cta: state.clubs.length ? '' : `<button class="btn btn-primary" onclick="openClubModal()">+ Add Club</button>` });
     return;
   }
-  list.innerHTML = `<table class="data-table"><thead><tr><th>Club</th><th>League</th><th>Manager</th><th>Captain</th><th class="num-c">Squad</th><th class="num-c">Stadium cap.</th><th class="actions-cell">Actions</th></tr></thead><tbody>` +
+  // Pre-compute overalls once for sort + display
+  const ovrMap = {};
+  for (const c of clubs) ovrMap[c.id] = clubOverall(c.id);
+  clubs.sort((a, b) => (ovrMap[b.id] || 0) - (ovrMap[a.id] || 0));
+  list.innerHTML = `<table class="data-table"><thead><tr><th>Club</th><th>League</th><th class="num-c">Ovr</th><th>Manager</th><th>Captain</th><th class="num-c">Squad</th><th class="num-c">Stadium cap.</th><th class="actions-cell">Actions</th></tr></thead><tbody>` +
     clubs.map(c => `<tr>
       <td><span class="dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${esc(c.kitPrimary || '#888')};margin-right:6px;vertical-align:middle"></span>${clubLink(c.id)}</td>
       <td>${leagueLink(c.leagueId) || '—'}</td>
+      <td class="num-c">${ovrPill(ovrMap[c.id])}</td>
       <td>${managerLink(c.managerId)}</td>
       <td>${playerLink(c.captainId)}</td>
       <td class="num-c">${playersByClub(c.id).filter(p => !p.isRetired).length}</td>
@@ -375,24 +380,25 @@ function renderClubDetailHTML(id) {
   const honours = clubHonours(id);
   let html = `<div class="back-link clickable" onclick="clearDetail()">‹ All clubs</div>`;
   html += `<div class="page-header">
-    <div><h1><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:${esc(c.kitPrimary || '#888')};margin-right:8px;vertical-align:middle"></span>${esc(c.name)}</h1>
+    <div><h1><span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:${esc(c.kitPrimary || '#888')};margin-right:8px;vertical-align:middle"></span>${esc(c.name)} ${ovrPill(clubOverall(c.id), true)}</h1>
     <div class="subtitle">${leagueLink(c.leagueId) || 'Unattached'} · ${esc(c.stadiumName || '?')} (cap. ${(c.stadiumCapacity||0).toLocaleString()})</div></div>
     <div class="flex gap-8"><button class="btn btn-primary" onclick="openClubModal('${c.id}')">Edit</button></div>
   </div>`;
   html += `<div class="two-col">
     <div>
       <div class="card mb-16"><h3>Squad <span class="text-muted" style="font-size:13px;font-weight:400">${squad.length} players</span></h3>
-        <div class="squad-row" style="border-bottom:2px solid var(--border);font-weight:600;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.04em">
-          <div class="sr-num">#</div><div class="sr-pos">Pos</div><div class="sr-name">Name</div><div class="sr-age">Age</div><div class="sr-nat">Nat.</div><div class="sr-status">Status</div><div class="sr-status">Apps · Goals</div>
+        <div class="squad-row" style="grid-template-columns: 30px 60px 1fr 50px 60px 60px 70px 60px;border-bottom:2px solid var(--border);font-weight:600;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.04em">
+          <div>#</div><div>Pos</div><div>Name</div><div class="text-right">Ovr</div><div class="text-right">Age</div><div>Nat.</div><div class="text-center">Status</div><div class="text-right">Apps · G</div>
         </div>
-        ${squad.map(p => `<div class="squad-row">
+        ${squad.map(p => `<div class="squad-row" style="grid-template-columns: 30px 60px 1fr 50px 60px 60px 70px 60px">
           <div class="sr-num">${p.shirtNumber ?? '-'}</div>
           <div class="sr-pos">${positionBadge(p.position)}</div>
           <div class="sr-name" onclick="openPlayerDetail('${p.id}')">${esc(p.name)}${c.captainId === p.id ? ' <span class="chip chip-accent" style="font-size:10px">C</span>' : c.viceCaptainId === p.id ? ' <span class="chip" style="font-size:10px">VC</span>' : ''}</div>
+          <div class="text-right">${ovrPill(playerOverall(p))}</div>
           <div class="sr-age">${p.age}</div>
-          <div class="sr-nat">${esc((p.nationality || '').replace('Generic ',''))}</div>
+          <div class="sr-nat">${esc(p.nationality || '')}</div>
           <div class="sr-status">${statusBadge(p)}</div>
-          <div class="sr-status">${p.seasonStats?.apps ?? 0} · ${p.seasonStats?.goals ?? 0}</div>
+          <div class="text-right">${p.seasonStats?.apps ?? 0} · ${p.seasonStats?.goals ?? 0}</div>
         </div>`).join('')}
         ${!squad.length ? '<div class="empty-state"><p>No players in this squad. Use the bulk-create option in Clubs view to populate.</p></div>' : ''}
       </div>
@@ -493,14 +499,16 @@ function renderPlayers() {
     list.innerHTML = emptyState({ icon: '☖', title: state.players.length ? 'No matches' : 'No players', body: state.players.length ? 'Adjust the search.' : 'Players are usually created via club bulk-create.' });
     return;
   }
-  players.sort((a, b) => b.attrs.shooting + b.attrs.defending + b.attrs.passing - (a.attrs.shooting + a.attrs.defending + a.attrs.passing));
-  list.innerHTML = `<table class="data-table"><thead><tr><th>#</th><th>Pos</th><th>Player</th><th>Club</th><th class="num-c">Age</th><th class="num-c">Apps</th><th class="num-c">G</th><th class="num-c">A</th><th>Status</th><th class="actions-cell"></th></tr></thead><tbody>` +
+  players.sort((a, b) => playerOverall(b) - playerOverall(a));
+  list.innerHTML = `<table class="data-table"><thead><tr><th>#</th><th>Pos</th><th>Player</th><th>Club</th><th class="num-c">Age</th><th class="num-c">Ovr</th><th>Nat.</th><th class="num-c">Apps</th><th class="num-c">G</th><th class="num-c">A</th><th>Status</th><th class="actions-cell"></th></tr></thead><tbody>` +
     players.slice(0, 500).map(p => `<tr>
       <td class="num">${p.shirtNumber ?? '-'}</td>
       <td>${positionBadge(p.position)}</td>
       <td>${playerLink(p.id)}</td>
       <td>${clubLink(p.clubId)}</td>
       <td class="num-c">${p.age}</td>
+      <td class="num-c">${ovrPill(playerOverall(p))}</td>
+      <td class="text-muted" style="font-size:11px">${esc(p.nationality || '')}</td>
       <td class="num-c">${p.seasonStats?.apps ?? 0}</td>
       <td class="num-c">${p.seasonStats?.goals ?? 0}</td>
       <td class="num-c">${p.seasonStats?.assists ?? 0}</td>
@@ -518,8 +526,8 @@ function renderPlayerDetailHTML(id) {
   const club = getClub(p.clubId);
   let html = `<div class="back-link clickable" onclick="clearDetail()">‹ All players</div>`;
   html += `<div class="page-header">
-    <div><h1>${esc(p.name)} ${positionBadge(p.position)}</h1>
-    <div class="subtitle">${esc(p.role)} · ${esc((p.nationality || '').replace('Generic ',''))} · age ${p.age}${p.isRetired ? ' · retired' : ''} · ${club ? clubLink(club.id) : 'free agent'}</div></div>
+    <div><h1>${esc(p.name)} ${positionBadge(p.position)} ${ovrPill(playerOverall(p), true)}</h1>
+    <div class="subtitle">${esc(p.role)} · ${esc(p.nationality || '')} · age ${p.age}${p.isRetired ? ' · retired' : ''} · ${club ? clubLink(club.id) : 'free agent'}</div></div>
     <div class="flex gap-8">
       ${!p.isRetired ? `<button class="btn" onclick="openTransferModal('${p.id}')">⇄ Transfer</button>` : ''}
       <button class="btn btn-primary" onclick="openPlayerModal('${p.id}')">Edit</button>
@@ -542,6 +550,7 @@ function renderPlayerDetailHTML(id) {
       </div>
       <div class="card mb-16"><h3>Career by season</h3>${renderPlayerCareerHTML(id, career)}</div>
       <div class="card mb-16"><h3>Match log <span class="text-muted" style="font-size:12px;font-weight:400">most recent first</span></h3>${renderPlayerMatchLogHTML(id)}</div>
+      <div class="card mb-16"><h3>Player history <span class="text-muted" style="font-size:12px;font-weight:400">all events touching this player</span></h3>${renderPlayerLedgerHTML(id)}</div>
       <div class="card"><h3>Transfers</h3>${renderPlayerTransfersHTML(id)}</div>
     </div>
     <div>
@@ -598,6 +607,60 @@ function renderPlayerMatchLogHTML(playerId) {
   }
   html += `</tbody></table>`;
   if (log.length > 200) html += `<p class="text-muted" style="margin-top:6px;font-size:11px">Showing 200 of ${log.length} matches.</p>`;
+  return html;
+}
+
+function renderPlayerLedgerHTML(playerId) {
+  const events = historyForPlayer(playerId).slice().sort((a, b) => b.ts - a.ts);
+  if (!events.length) return '<p class="text-muted" style="font-size:12px">No events recorded yet.</p>';
+  let html = '<div class="news-list">';
+  for (const e of events.slice(0, 200)) {
+    let txt = '';
+    let cls = '';
+    switch (e.type) {
+      case 'match_committed': {
+        const home = clubName(e.homeId), away = clubName(e.awayId);
+        const apps = (e.appearances || []).filter(a => a.playerId === playerId);
+        const ourSide = apps[0]?.side;
+        const ourGoals = (e.scorers || []).filter(s => s.playerId === playerId && !s.ownGoal).length;
+        const ourAssists = (e.scorers || []).filter(s => s.assistId === playerId).length;
+        const stat = [];
+        if (ourGoals) stat.push(`${ourGoals} goal${ourGoals === 1 ? '' : 's'}`);
+        if (ourAssists) stat.push(`${ourAssists} assist${ourAssists === 1 ? '' : 's'}`);
+        const yellow = (e.cards || []).filter(c => c.playerId === playerId && c.type === 'yellow').length;
+        const red = (e.cards || []).filter(c => c.playerId === playerId && c.type === 'red').length;
+        if (yellow) stat.push(`${yellow}Y`);
+        if (red) stat.push(`${red}R`);
+        const meta = e.leagueId ? `${getLeague(e.leagueId)?.name || '?'} MD${e.matchday}` : (e.cupId ? getCup(e.cupId)?.name || '?' : '');
+        txt = `<a class="clickable" onclick="viewMatchModal('${e.id}')">${esc(home)} ${e.hScore}–${e.aScore} ${esc(away)}</a> <span class="text-muted">${esc(meta)}</span>${stat.length ? ` <span class="text-accent">— ${stat.join(', ')}</span>` : ''}`;
+        if (ourGoals) cls = 'ni-major';
+        if (red) cls = 'ni-danger';
+        break;
+      }
+      case 'player_signed': {
+        const fee = e.freeTransfer ? 'free' : (e.fee ? e.fee.toLocaleString() : '?');
+        txt = `Transferred: ${e.fromClubId ? clubLink(e.fromClubId) : 'free agent'} → ${e.toClubId ? clubLink(e.toClubId) : 'released'} <span class="text-muted">(${fee})</span>`;
+        cls = 'ni-major';
+        break;
+      }
+      case 'player_injured': txt = `Injured for ${e.matches} match(es)`; cls = 'ni-danger'; break;
+      case 'player_suspended': txt = `Suspended ${e.games} game(s)${e.reason ? ` (${esc(e.reason)})` : ''}`; cls = 'ni-warn'; break;
+      case 'player_retired': txt = `Retired at age ${e.age}`; cls = 'ni-major'; break;
+      case 'player_to_manager': txt = `Entered management as ${managerLink(e.managerId)}`; cls = 'ni-major'; break;
+      case 'nt_callup': txt = `Called up to ${esc(e.nation || '?')}`; cls = 'ni-major'; break;
+      case 'season_ended': {
+        if (e.topScorer && e.topScorer.playerId === playerId) {
+          txt = `Top scorer of ${getLeague(e.leagueId)?.name || '?'} (${e.topScorer.goals} goals)`;
+          cls = 'ni-major';
+        } else continue;
+        break;
+      }
+      default: txt = esc(e.type);
+    }
+    html += `<div class="news-item ${cls}"><div class="ni-icon">▸</div><div class="ni-text">${txt}</div><div class="ni-time">S${e.season}</div></div>`;
+  }
+  html += '</div>';
+  if (events.length > 200) html += `<p class="text-muted" style="margin-top:6px;font-size:11px">Showing 200 of ${events.length} events.</p>`;
   return html;
 }
 
@@ -663,7 +726,7 @@ function renderManagerDetailHTML(id) {
   let html = `<div class="back-link clickable" onclick="clearDetail()">‹ All managers</div>`;
   html += `<div class="page-header">
     <div><h1>${esc(m.firstName)} ${esc(m.lastName)}</h1>
-    <div class="subtitle">${esc((m.nationality || '').replace('Generic ',''))} · ${m.isUnemployed ? 'unemployed' : `at ${clubName(m.clubId)}`}${formerPlayer ? ` · former player (${formerPlayer.position})` : ''}</div></div>
+    <div class="subtitle">${esc(m.nationality || '')} · ${m.isUnemployed ? 'unemployed' : `at ${clubName(m.clubId)}`}${formerPlayer ? ` · former player (${formerPlayer.position})` : ''}</div></div>
     <div class="flex gap-8"><button class="btn btn-primary" onclick="openManagerModal('${m.id}')">Edit</button></div>
   </div>`;
   html += `<div class="two-col">

@@ -144,6 +144,11 @@ function positionLabel(p) {
   return p.role || p.position;
 }
 
+function ovrPill(rating, big) {
+  const r = rating | 0;
+  return `<span class="ovr ${ratingClass(r)} ${big ? 'ovr-lg' : ''}">${r}</span>`;
+}
+
 function statusBadge(player) {
   if (!player) return '';
   if (player.isRetired) return `<span class="chip">retired</span>`;

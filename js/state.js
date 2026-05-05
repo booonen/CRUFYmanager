@@ -8,11 +8,63 @@
  *   (career stats, club honours, season-by-season tables, news feed).
  * ========================================================================= */
 
-const STATE_KEY = 'crufy_save_v1';
+const STATE_KEY = 'crufy_save_v1';   // legacy localStorage key (migrated on load)
+const DB_NAME = 'crufy';
+const DB_VERSION = 1;
+const STORE = 'saves';
 const SCHEMA_VERSION = 1;
 
 let state = null;
 let _saveDebounce = null;
+let _dbPromise = null;
+let _saveInFlight = false;
+let _saveQueued = false;
+
+/* ===========================================================================
+ * IndexedDB wrapper — small promise-y shim around a single object store.
+ * ========================================================================= */
+function _openDB() {
+  if (_dbPromise) return _dbPromise;
+  _dbPromise = new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') { reject(new Error('IndexedDB not available')); return; }
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IndexedDB open failed'));
+  });
+  return _dbPromise;
+}
+
+function _idbGet(key) {
+  return _openDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  }));
+}
+
+function _idbPut(key, value) {
+  return _openDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).put(value, key);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+    tx.onabort = () => reject(tx.error || new Error('IDB tx aborted'));
+  }));
+}
+
+function _idbDel(key) {
+  return _openDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  }));
+}
 
 /* ===========================================================================
  * Default state
@@ -62,21 +114,33 @@ function deepClone(obj) {
 
 /* ===========================================================================
  * Load / save
+ *
+ *   Primary store is IndexedDB (much larger quota than localStorage). On
+ *   first load we also check for a legacy localStorage save and migrate
+ *   it across, then delete the localStorage copy to free that quota.
  * ========================================================================= */
 async function loadState() {
+  // 1) Prefer IndexedDB
   let raw = null;
-  try { raw = localStorage.getItem(STATE_KEY); } catch (e) { /* private mode etc. */ }
-  if (!raw) {
-    state = defaultState();
-    return state;
-  }
   try {
-    const parsed = JSON.parse(raw);
-    state = migrateState(parsed);
+    raw = await _idbGet('main');
   } catch (e) {
-    console.warn('Failed to parse save, starting fresh', e);
-    state = defaultState();
+    console.warn('IndexedDB read failed, falling back to localStorage', e);
   }
+  // 2) Migrate from localStorage if present
+  if (!raw) {
+    try {
+      const legacy = localStorage.getItem(STATE_KEY);
+      if (legacy) {
+        raw = JSON.parse(legacy);
+        try { await _idbPut('main', raw); localStorage.removeItem(STATE_KEY); console.log('Migrated save from localStorage to IndexedDB'); }
+        catch (e) { console.warn('Could not migrate to IDB:', e); }
+      }
+    } catch (e) { /* ignore */ }
+  }
+  if (!raw) { state = defaultState(); return state; }
+  try { state = migrateState(raw); }
+  catch (e) { console.warn('Failed to migrate save, starting fresh', e); state = defaultState(); }
   return state;
 }
 
@@ -110,7 +174,7 @@ function migrateState(parsed) {
 }
 
 /* User-triggered compactor — same logic, callable from Settings. */
-function compactSaveNow() {
+async function compactSaveNow() {
   let slimmed = 0;
   for (const e of state.history) {
     if (e.type !== 'match_committed') continue;
@@ -118,22 +182,29 @@ function compactSaveNow() {
     if (e.homeXI) { e.homeFormation = e.homeFormation || (e.homeXI.formation || null); delete e.homeXI; }
     if (e.awayXI) { e.awayFormation = e.awayFormation || (e.awayXI.formation || null); delete e.awayXI; }
   }
-  saveStateNow();
+  await saveStateNow();
   return slimmed;
 }
 
 function saveState() {
   if (_saveDebounce) clearTimeout(_saveDebounce);
-  _saveDebounce = setTimeout(() => {
-    try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
-    catch (e) { showToast('Save failed: ' + e.message, 'error'); }
-  }, 80);
+  _saveDebounce = setTimeout(() => { _saveDebounce = null; saveStateNow(); }, 120);
 }
 
+/* Coalesce concurrent save attempts: if a save is already running, mark a
+ * follow-up save needed when it finishes. Returns the in-flight promise. */
 function saveStateNow() {
   if (_saveDebounce) { clearTimeout(_saveDebounce); _saveDebounce = null; }
-  try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
-  catch (e) { showToast('Save failed: ' + e.message, 'error'); }
+  if (_saveInFlight) { _saveQueued = true; return Promise.resolve(); }
+  _saveInFlight = true;
+  const snapshot = state;
+  return _idbPut('main', snapshot).catch(err => {
+    showToast('Save failed: ' + (err.message || err), 'error');
+    console.error('IDB save failed', err);
+  }).finally(() => {
+    _saveInFlight = false;
+    if (_saveQueued) { _saveQueued = false; saveStateNow(); }
+  });
 }
 
 function exportSave() {
@@ -154,13 +225,13 @@ function handleImport(ev) {
   const file = ev.target.files && ev.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const parsed = JSON.parse(e.target.result);
       if (!parsed || !parsed.version) throw new Error('Not a CRUFY save');
       if (!confirm('Importing will replace your current save. Continue?')) return;
       state = migrateState(parsed);
-      saveStateNow();
+      await saveStateNow();
       showToast('Save imported', 'success');
       refreshAll();
       switchTab('dashboard');
@@ -172,12 +243,14 @@ function handleImport(ev) {
   reader.readAsText(file);
 }
 
-function resetSave() {
+async function resetSave() {
   if (!confirm('This wipes all data including history. Type-confirm in next prompt to be sure.')) return;
   const confirmation = prompt('Type RESET to wipe everything:');
   if (confirmation !== 'RESET') { showToast('Reset cancelled', 'warning'); return; }
   state = defaultState();
-  saveStateNow();
+  try { await _idbDel('main'); } catch (e) { /* ignore */ }
+  await saveStateNow();
+  try { localStorage.removeItem(STATE_KEY); } catch (e) {}
   refreshAll();
   switchTab('settings');
   showToast('Save wiped', 'success');
@@ -606,4 +679,47 @@ function allTimeTitleHolders(limit = 25) {
     .map(([clubId, titles]) => ({ clubId, titles }))
     .sort((a, b) => b.titles - a.titles)
     .slice(0, limit);
+}
+
+/* ===========================================================================
+ * Skill / overall rating helpers
+ *
+ *   playerOverall(p): 1-99 weighted aggregate of attrs, position-aware.
+ *   clubOverall(c):   avg of top-11 player overalls in the squad.
+ * ========================================================================= */
+function playerOverall(p) {
+  if (!p) return 0;
+  const a = p.attrs || {};
+  const safe = (k) => a[k] || 1;
+  if (p.position === 'GK') {
+    return Math.round((safe('goalkeeping') * 1.6 + safe('mental') * 0.6 + safe('strength') * 0.4 + safe('passing') * 0.2) / 2.8);
+  }
+  if (p.position === 'DF') {
+    return Math.round((safe('defending') * 1.4 + safe('strength') * 0.7 + safe('pace') * 0.6 + safe('mental') * 0.5 + safe('passing') * 0.3 + safe('technique') * 0.3) / 3.8);
+  }
+  if (p.position === 'MF') {
+    return Math.round((safe('passing') * 1.0 + safe('technique') * 0.9 + safe('mental') * 0.7 + safe('defending') * 0.4 + safe('shooting') * 0.4 + safe('pace') * 0.4) / 3.8);
+  }
+  if (p.position === 'FW') {
+    return Math.round((safe('shooting') * 1.4 + safe('pace') * 0.9 + safe('technique') * 0.8 + safe('mental') * 0.4 + safe('passing') * 0.3) / 3.8);
+  }
+  return 50;
+}
+
+function clubOverall(clubId) {
+  const c = typeof clubId === 'string' ? getClub(clubId) : clubId;
+  if (!c) return 0;
+  const squad = playersByClub(c.id).filter(p => !p.isRetired);
+  if (!squad.length) return 0;
+  const top11 = squad.map(playerOverall).sort((a, b) => b - a).slice(0, Math.min(11, squad.length));
+  return Math.round(top11.reduce((a, b) => a + b, 0) / top11.length);
+}
+
+/* Colour-class helper for ratings (used in tables/pills) */
+function ratingClass(r) {
+  if (r >= 80) return 'rating-elite';
+  if (r >= 70) return 'rating-strong';
+  if (r >= 55) return 'rating-mid';
+  if (r >= 40) return 'rating-weak';
+  return 'rating-poor';
 }

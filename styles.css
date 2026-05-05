@@ -449,6 +449,20 @@ input[type="range"] { accent-color: var(--accent); }
 .news-item.ni-warn { border-left: 3px solid var(--warn); }
 .news-item.ni-danger { border-left: 3px solid var(--danger); }
 
+/* Overall rating pill */
+.ovr {
+  display: inline-block; min-width: 32px; padding: 2px 8px;
+  border-radius: 6px; font-family: var(--font-mono); font-size: 12px;
+  font-weight: 600; text-align: center; background: var(--bg-input);
+  color: var(--text);
+}
+.ovr.rating-elite  { background: var(--warn); color: #1a1300; }
+.ovr.rating-strong { background: var(--accent); color: #fff; }
+.ovr.rating-mid    { background: var(--info-dim); color: var(--info); }
+.ovr.rating-weak   { background: var(--bg-input); color: var(--text-dim); }
+.ovr.rating-poor   { background: var(--bg-input); color: var(--text-muted); }
+.ovr.ovr-lg { font-size: 18px; padding: 4px 14px; min-width: 50px; }
+
 /* Player attribute pill */
 .attr-pills { display: flex; gap: 4px; flex-wrap: wrap; }
 .attr-pill {

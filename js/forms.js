@@ -179,6 +179,7 @@ function openClubModal(id) {
     formation: DEFAULT_FORMATION,
     tactics: { mentality: 50, tempo: 50, pressing: 50 },
     nameBankPref: state.settings.defaultNameBank,
+    nationality: state.settings.nation?.name || '',
     managerId: null,
     leagueId: null,
     reputation: 50,
@@ -205,8 +206,9 @@ function openClubModal(id) {
     </div>
     <div class="form-row">
       ${formGroup('Default formation', formSelect('cl-form', draft.formation, Object.keys(FORMATIONS)))}
-      ${formGroup('Player nationality bank', formSelect('cl-bank', draft.nameBankPref, Object.keys(state.nameBanks)))}
+      ${formGroup('Club nationality', `<input type="text" id="cl-nat" value="${esc(draft.nationality || '')}" placeholder="${esc(state.settings.nation?.name || 'England')}" list="nat-list-cl"><datalist id="nat-list-cl">${[...new Set(state.clubs.map(cc => cc.nationality).filter(Boolean))].map(n => `<option value="${esc(n)}">`).join('')}</datalist>`, 'Auto-generated players inherit this.')}
     </div>
+    ${formGroup('Name bank for new players from this club', formSelect('cl-bank', draft.nameBankPref, Object.keys(state.nameBanks)), 'Naming source only — has no effect on stored nationality.')}
     <h4>Tactics</h4>
     <div class="slider-row"><label>Mentality</label><input type="range" id="cl-mentality" min="0" max="100" value="${draft.tactics.mentality}" oninput="this.nextElementSibling.textContent=this.value"><div class="slider-val">${draft.tactics.mentality}</div></div>
     <div class="slider-scale" style="margin-left:122px;margin-top:-2px"><span>defensive</span><span>balanced</span><span>attacking</span></div>
@@ -248,6 +250,7 @@ function saveClubFromForm(id) {
     kitSecondary: document.getElementById('cl-kit2').value.trim() || '#ffffff',
     formation: document.getElementById('cl-form').value,
     nameBankPref: document.getElementById('cl-bank').value,
+    nationality: document.getElementById('cl-nat').value.trim(),
     tactics: {
       mentality: parseInt(document.getElementById('cl-mentality').value) || 50,
       tempo: parseInt(document.getElementById('cl-tempo').value) || 50,
@@ -315,13 +318,14 @@ function openGenerateClubsModal() {
       ${formGroup('League', formSelect('gen-league', '', [{value:'', label:'(none)'}, ...state.leagues.map(l => ({value: l.id, label: l.name}))]))}
     </div>
     <div class="form-row">
-      ${formGroup('Default name bank', formSelect('gen-bank', state.settings.defaultNameBank, Object.keys(state.nameBanks)))}
-      ${formGroup('Avg quality (0–99)', `<input type="number" id="gen-quality" value="55" min="20" max="90">`)}
+      ${formGroup('Name bank (for naming)', formSelect('gen-bank', state.settings.defaultNameBank, Object.keys(state.nameBanks)))}
+      ${formGroup('Nationality (display)', `<input type="text" id="gen-nat" value="${esc(state.settings.nation?.name || '')}" placeholder="${esc(state.settings.nation?.name || 'e.g. Demolandia')}">`)}
     </div>
     <div class="form-row">
-      ${formGroup('Squad size per club', `<input type="number" id="gen-squad" value="22" min="11" max="40">`)}
-      ${formGroup('Quality variance (±)', `<input type="number" id="gen-var" value="10" min="0" max="40">`)}
+      ${formGroup('Avg quality (0–99)', `<input type="number" id="gen-quality" value="55" min="20" max="90">`)}
+      ${formGroup('Variance (±)', `<input type="number" id="gen-var" value="10" min="0" max="40">`)}
     </div>
+    ${formGroup('Squad size per club', `<input type="number" id="gen-squad" value="22" min="11" max="40">`)}
     <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="gen-mgrs" checked> Generate a manager per club</label>
     <label style="display:flex;gap:6px;align-items:center;cursor:pointer;margin-top:4px"><input type="checkbox" id="gen-schedule" checked> Generate league schedule after</label>
   `;
@@ -336,6 +340,7 @@ function runBulkClubGeneration() {
   const n = clamp(parseInt(document.getElementById('gen-count').value) || 12, 2, 40);
   const leagueId = document.getElementById('gen-league').value || null;
   const bank = document.getElementById('gen-bank').value;
+  const nationality = document.getElementById('gen-nat').value.trim() || state.settings.nation?.name || bankToCountryLabel(bank);
   const baseQ = clamp(parseInt(document.getElementById('gen-quality').value) || 55, 20, 90);
   const variance = clamp(parseInt(document.getElementById('gen-var').value) || 10, 0, 40);
   const squad = clamp(parseInt(document.getElementById('gen-squad').value) || 22, 11, 40);
@@ -346,14 +351,14 @@ function runBulkClubGeneration() {
   for (let i = 0; i < n; i++) {
     const q = baseQ + pickInt(-variance, variance);
     const nameBank = state.nameBanks[bank] ? bank : state.settings.defaultNameBank;
-    const c = generateClub({ leagueId, quality: q, nameBankPref: nameBank });
+    const c = generateClub({ leagueId, quality: q, nameBankPref: nameBank, nationality });
     if (leagueId) {
       const lg = getLeague(leagueId);
       if (lg && !lg.clubIds.includes(c.id)) lg.clubIds.push(c.id);
     }
-    generateSquad(c.id, { size: squad, quality: q, nameBank });
+    generateSquad(c.id, { size: squad, quality: q, nameBank, nationality });
     if (genMgrs) {
-      const m = generateManager({ nationality: nameBank });
+      const m = generateManager({ nameBank, nationality });
       m.clubId = c.id; m.isUnemployed = false; c.managerId = m.id;
       historyAppend('manager_hired', { managerId: m.id, clubId: c.id });
     }
@@ -371,13 +376,14 @@ function openPlayerModal(id) {
   const p = id ? getPlayer(id) : null;
   const draft = p ? deepClone(p) : {
     id: null, firstName: '', lastName: '', name: '',
-    nationality: state.settings.defaultNameBank,
+    nationality: state.settings.nation?.name || bankToCountryLabel(state.settings.defaultNameBank),
+    nameBankUsed: state.settings.defaultNameBank,
     age: 22, position: 'MF', role: 'CM',
     attrs: { pace: 50, strength: 50, technique: 50, passing: 50, defending: 50, shooting: 50, mental: 50, goalkeeping: 1 },
     potential: 70, injuryProneness: 20,
     clubId: null, shirtNumber: null,
     contract: { wage: 1000, years: 3 },
-    status: { injuredUntil: 0, suspendedFor: 0, yellowsThisSeason: 0 },
+    status: { injuredUntil: 0, suspendedFor: 0, yellowsThisSeason: 0, fatigue: 0 },
     seasonStats: { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 },
     isRetired: false,
   };
@@ -388,7 +394,7 @@ function openPlayerModal(id) {
     </div>
     <div class="form-row-3">
       ${formGroup('Age', `<input type="number" id="pl-age" min="14" max="50" value="${draft.age}">`)}
-      ${formGroup('Nationality', formSelect('pl-nat', draft.nationality, Object.keys(state.nameBanks)))}
+      ${formGroup('Nationality', `<input type="text" id="pl-nat" value="${esc(draft.nationality || '')}" placeholder="e.g. ${esc(state.settings.nation?.name || 'England')}" list="nat-list"><datalist id="nat-list">${[...new Set(state.players.map(p => p.nationality).filter(Boolean))].map(n => `<option value="${esc(n)}">`).join('')}</datalist>`, 'Free-form: country, region, anything you like.')}
       ${formGroup('Shirt number', `<input type="number" id="pl-shirt" min="1" max="99" value="${draft.shirtNumber ?? ''}">`)}
     </div>
     <div class="form-row-3">
@@ -396,6 +402,7 @@ function openPlayerModal(id) {
       ${formGroup('Role', `<input type="text" id="pl-role" value="${esc(draft.role)}" placeholder="e.g. CB, CM, ST">`)}
       ${formGroup('Club', formSelect('pl-club', draft.clubId || '', [{value:'', label:'(free agent)'}, ...state.clubs.map(c => ({value: c.id, label: c.name}))]))}
     </div>
+    ${!p ? formGroup('Auto-name source bank', formSelect('pl-bank', draft.nameBankUsed, Object.keys(state.nameBanks)), 'Used only if first/last names are blank — picks a random matching name.') : ''}
     <h4>Attributes (1–99)</h4>
     <div class="form-row-4">
       ${formGroup('Pace', `<input type="number" id="pl-pace" min="1" max="99" value="${draft.attrs.pace}">`)}
@@ -429,7 +436,7 @@ function savePlayerFromForm(id) {
     firstName: document.getElementById('pl-first').value.trim(),
     lastName: document.getElementById('pl-last').value.trim(),
     age: parseInt(document.getElementById('pl-age').value) || 22,
-    nationality: document.getElementById('pl-nat').value,
+    nationality: document.getElementById('pl-nat').value.trim(),
     shirtNumber: parseInt(document.getElementById('pl-shirt').value) || null,
     position: document.getElementById('pl-pos').value,
     role: document.getElementById('pl-role').value.trim().toUpperCase() || 'CM',
@@ -448,7 +455,16 @@ function savePlayerFromForm(id) {
     potential: parseInt(document.getElementById('pl-pot').value) || 70,
     injuryProneness: parseInt(document.getElementById('pl-prone').value) || 20,
   };
+  // Auto-fill names if blank using selected bank
+  if (!player && (!data.firstName || !data.lastName)) {
+    const bankName = document.getElementById('pl-bank')?.value || state.settings.defaultNameBank;
+    const bank = state.nameBanks[bankName] || DEFAULT_NAME_BANKS[bankName] || DEFAULT_NAME_BANKS['Generic English'];
+    if (!data.firstName) data.firstName = pick(bank.firstNames);
+    if (!data.lastName) data.lastName = pick(bank.lastNames);
+    data.nameBankUsed = bankName;
+  }
   if (!data.firstName || !data.lastName) { showToast('First and last names required', 'error'); return; }
+  if (!data.nationality) data.nationality = state.settings.nation?.name || '';
   data.name = `${data.firstName} ${data.lastName}`;
 
   if (player) {
@@ -458,7 +474,7 @@ function savePlayerFromForm(id) {
       id: uid('p_'),
       dob: { year: state.settings.season - data.age },
       contract: { wage: 1000, years: 3 },
-      status: { injuredUntil: 0, suspendedFor: 0, yellowsThisSeason: 0 },
+      status: { injuredUntil: 0, suspendedFor: 0, yellowsThisSeason: 0, fatigue: 0 },
       seasonStats: { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 },
     }, data));
   }
@@ -506,7 +522,9 @@ function confirmTransfer(playerId) {
 function openManagerModal(id) {
   const m = id ? getManager(id) : null;
   const draft = m ? deepClone(m) : {
-    id: null, firstName: '', lastName: '', nationality: state.settings.defaultNameBank,
+    id: null, firstName: '', lastName: '',
+    nationality: state.settings.nation?.name || bankToCountryLabel(state.settings.defaultNameBank),
+    nameBankUsed: state.settings.defaultNameBank,
     attrs: { tactical: 60, manManagement: 60, youthDev: 60, reputation: 60 },
     formerPlayerId: null, clubId: null, isUnemployed: true
   };
@@ -516,7 +534,7 @@ function openManagerModal(id) {
       ${formGroup('Last name', `<input type="text" id="mg-last" value="${esc(draft.lastName)}">`)}
     </div>
     <div class="form-row">
-      ${formGroup('Nationality', formSelect('mg-nat', draft.nationality, Object.keys(state.nameBanks)))}
+      ${formGroup('Nationality', `<input type="text" id="mg-nat" value="${esc(draft.nationality || '')}" placeholder="${esc(state.settings.nation?.name || 'England')}">`)}
       ${formGroup('Club', formSelect('mg-club', draft.clubId || '', [{value:'', label:'(unemployed)'}, ...state.clubs.map(c => ({value: c.id, label: c.name}))]))}
     </div>
     <h4>Attributes (1–99)</h4>
@@ -539,7 +557,7 @@ function saveManagerFromForm(id) {
   const data = {
     firstName: document.getElementById('mg-first').value.trim(),
     lastName: document.getElementById('mg-last').value.trim(),
-    nationality: document.getElementById('mg-nat').value,
+    nationality: document.getElementById('mg-nat').value.trim(),
     clubId: document.getElementById('mg-club').value || null,
     attrs: {
       tactical: parseInt(document.getElementById('mg-tac').value) || 60,

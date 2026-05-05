@@ -208,11 +208,11 @@ function renderNationalTeam() {
   if (!nat) { root.innerHTML = emptyState({ icon: '★', title: 'No nation set', body: 'Set your nation name in Settings to manage a national team.', cta: `<button class="btn btn-primary" onclick="switchTab('settings')">Open Settings</button>` }); return; }
 
   state.settings.ntSquad = state.settings.ntSquad || [];
-  const eligible = state.players.filter(p => !p.isRetired && p.nationality === state.settings.defaultNameBank);
+  const eligible = state.players.filter(p => !p.isRetired && p.nationality === nat);
   const currentSquad = state.settings.ntSquad.map(getPlayer).filter(Boolean);
 
   let html = `<div class="page-header">
-    <div><h2 style="font-family:var(--font-display)">${esc(nat)} senior squad</h2><div class="subtitle">${currentSquad.length} called up</div></div>
+    <div><h2 style="font-family:var(--font-display)">${esc(nat)} senior squad</h2><div class="subtitle">${currentSquad.length} called up · ${eligible.length} eligible</div></div>
     <div class="flex gap-8">
       <button class="btn" onclick="copyToClipboard(bbcodeNTSquad())">📋 BBCode squad</button>
       <button class="btn btn-warn" onclick="autoPickNTSquad()">⚡ Auto-pick best 23</button>
@@ -224,7 +224,7 @@ function renderNationalTeam() {
   html += `<div class="two-col">
     <div>
       <div class="card"><h3>Eligible players (${eligible.length})</h3>
-        <p class="text-muted">Eligibility = nationality matches your default name bank. Click ✓/✗ to toggle.</p>
+        <p class="text-muted">Eligibility = nationality matches "${esc(nat)}". Click ✓/✗ to toggle.</p>
         <table class="data-table"><thead><tr><th>Player</th><th>Pos</th><th>Club</th><th class="num-c">Age</th><th class="num-c">Rating</th><th></th></tr></thead><tbody>
           ${eligible.sort((a,b) => approxRating(b) - approxRating(a)).map(p => {
             const inSquad = state.settings.ntSquad.includes(p.id);
@@ -255,11 +255,7 @@ function renderNationalTeam() {
 }
 
 function approxRating(p) {
-  const a = p.attrs;
-  if (p.position === 'GK') return Math.round((a.goalkeeping * 1.4 + a.mental * 0.6) / 2);
-  if (p.position === 'DF') return Math.round((a.defending * 1.2 + a.strength * 0.7 + a.pace * 0.6 + a.mental * 0.5) / 3);
-  if (p.position === 'MF') return Math.round((a.passing + a.technique + a.mental * 0.7) / 2.7);
-  return Math.round((a.shooting * 1.2 + a.pace + a.technique) / 3.2);
+  return playerOverall(p);
 }
 
 function toggleNTSquad(playerId) {
@@ -274,7 +270,8 @@ function toggleNTSquad(playerId) {
 }
 
 function autoPickNTSquad() {
-  const eligible = state.players.filter(p => !p.isRetired && p.nationality === state.settings.defaultNameBank);
+  const nat = state.settings.nation.name;
+  const eligible = state.players.filter(p => !p.isRetired && p.nationality === nat);
   const byPos = { GK: [], DF: [], MF: [], FW: [] };
   for (const p of eligible) byPos[p.position].push(p);
   for (const k of Object.keys(byPos)) byPos[k].sort((a, b) => approxRating(b) - approxRating(a));
@@ -521,16 +518,19 @@ function renderSettings() {
       ${formGroup('Football association name', `<input type="text" id="set-fa" value="${esc(n.faName)}" placeholder="e.g. Demolandian FA">`)}
       ${formGroup('Flag URL (optional)', `<input type="url" id="set-flag" value="${esc(n.flagUrl)}" placeholder="https://...">`)}
     </div>
-    ${formGroup('Default nationality (name bank for new players/managers)', formSelect('set-default-bank', state.settings.defaultNameBank, Object.keys(state.nameBanks)))}
-    <button class="btn btn-primary" onclick="saveNationSettings()">Save identity</button>
+    ${formGroup('Default name bank for new players/managers', formSelect('set-default-bank', state.settings.defaultNameBank, Object.keys(state.nameBanks)), 'A name bank only supplies first/last names. Player nationality is a separate field, defaulting to your nation name above.')}
+    <div class="flex gap-8 mt-8">
+      <button class="btn btn-primary" onclick="saveNationSettings()">Save identity</button>
+      <button class="btn" onclick="retagAllPlayersToNation()" title="Set every domestic-club player's nationality to the nation name above. Useful if your existing roster has banks-as-nationality from older saves.">⟲ Re-tag domestic players</button>
+    </div>
   </div>`;
 
   // Storage / compaction
   html += `<div class="card mb-16"><h3>Storage</h3>
     <p class="text-muted">Older saves can store verbose match-by-match commentary. Compacting strips that and keeps only the slim record (scorers, cards, stats). Match reports stay viewable — commentary is regenerated on the fly.</p>
     <div class="flex gap-8 flex-wrap">
-      <button class="btn" onclick="(()=>{ const n = compactSaveNow(); refreshAll(); showToast('Compacted ' + n + ' historic match records', n ? 'success' : 'warning'); })()">⚙ Compact save now</button>
-      <button class="btn" onclick="alert('Approximate save size: ' + Math.round((JSON.stringify(state).length || 0) / 1024) + ' KB. Browser localStorage caps are typically 5–10 MB.')">📊 Save size</button>
+      <button class="btn" onclick="(async()=>{ const n = await compactSaveNow(); refreshAll(); showToast('Compacted ' + n + ' historic match records', n ? 'success' : 'warning'); })()">⚙ Compact save now</button>
+      <button class="btn" onclick="alert('Approximate save size: ' + Math.round((JSON.stringify(state).length || 0) / 1024) + ' KB. CRUFY now uses IndexedDB which typically allows hundreds of MB.')">📊 Save size</button>
     </div>
   </div>`;
 
@@ -569,6 +569,29 @@ function saveNationSettings() {
   state.settings.defaultNameBank = document.getElementById('set-default-bank').value;
   saveState(); refreshAll();
   showToast('Nation identity saved', 'success');
+}
+
+function retagAllPlayersToNation() {
+  const nat = state.settings.nation.name;
+  if (!nat) { showToast('Set your nation name first', 'warning'); return; }
+  const domesticLeagueIds = new Set(state.leagues.map(l => l.id));
+  let retaggedPlayers = 0, retaggedClubs = 0;
+  for (const c of state.clubs) {
+    if (domesticLeagueIds.has(c.leagueId) && c.nationality !== nat) {
+      c.nationality = nat;
+      retaggedClubs++;
+    }
+  }
+  for (const p of state.players) {
+    if (p.isRetired) continue;
+    const c = p.clubId ? getClub(p.clubId) : null;
+    if (c && domesticLeagueIds.has(c.leagueId) && p.nationality !== nat) {
+      p.nationality = nat;
+      retaggedPlayers++;
+    }
+  }
+  saveState(); refreshAll();
+  showToast(`Re-tagged ${retaggedPlayers} players + ${retaggedClubs} clubs to "${nat}"`, 'success');
 }
 function saveEngineSettings() {
   state.settings.yellowsForBan = clamp(parseInt(document.getElementById('set-yellows').value) || 5, 1, 30);

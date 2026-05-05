@@ -12,8 +12,16 @@
 /* ===========================================================================
  * Player / club / manager generation
  * ========================================================================= */
-function generatePlayer({ nationality, position, role, ageBand, qualityBand = 50, clubId = null } = {}) {
-  nationality = nationality || state.settings.defaultNameBank || 'Generic English';
+function generatePlayer({ nationality, nameBank, position, role, ageBand, qualityBand = 50, clubId = null } = {}) {
+  // nameBank is the source of names (e.g. 'Generic English').
+  // nationality is the displayed nationality (e.g. 'Demolandia') — independent.
+  nameBank = nameBank || (clubId ? (getClub(clubId)?.nameBankPref) : null) || state.settings.defaultNameBank || 'Generic English';
+  if (!nationality) {
+    const club = clubId ? getClub(clubId) : null;
+    nationality = club?.nationality
+      || state.settings.nation?.name
+      || bankToCountryLabel(nameBank);
+  }
   if (!position) position = pickPositionForSquad();
   if (!role) role = pick(POSITION_ROLES[position]);
 
@@ -78,6 +86,7 @@ function generatePlayer({ nationality, position, role, ageBand, qualityBand = 50
     firstName: '', lastName: '',
     name: '',
     nationality,
+    nameBankUsed: nameBank,
     age, dob,
     position, role,
     attrs: { pace, strength, technique, passing, defending, shooting, mental, goalkeeping },
@@ -86,18 +95,19 @@ function generatePlayer({ nationality, position, role, ageBand, qualityBand = 50
     clubId,
     shirtNumber: null,
     contract: { wage: pickInt(50, 500) * 10, years: pickInt(1, 5) },
-    status: { injuredUntil: 0, suspendedFor: 0, yellowsThisSeason: 0 },
+    status: { injuredUntil: 0, suspendedFor: 0, yellowsThisSeason: 0, fatigue: 0 },
     seasonStats: { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 },
     isRetired: false,
   };
 }
 
 function fillPlayerName(player, bankName) {
-  bankName = bankName || player.nationality || 'Generic English';
+  bankName = bankName || player.nameBankUsed || 'Generic English';
   const bank = state.nameBanks[bankName] || DEFAULT_NAME_BANKS[bankName] || DEFAULT_NAME_BANKS['Generic English'];
   player.firstName = pick(bank.firstNames);
   player.lastName  = pick(bank.lastNames);
   player.name = `${player.firstName} ${player.lastName}`;
+  player.nameBankUsed = bankName;
   return player;
 }
 
@@ -116,6 +126,7 @@ function generateSquad(clubId, opts = {}) {
   const size = opts.size || 22;
   const quality = opts.quality || 55;
   const bank = opts.nameBank || club.nameBankPref || state.settings.defaultNameBank;
+  const nationality = opts.nationality || club.nationality || state.settings.nation?.name || bankToCountryLabel(bank);
 
   const composition = [
     { position: 'GK', count: 3 },
@@ -129,7 +140,8 @@ function generateSquad(clubId, opts = {}) {
   for (const slot of composition) {
     for (let i = 0; i < slot.count; i++) {
       const p = generatePlayer({
-        nationality: bank,
+        nationality,
+        nameBank: bank,
         position: slot.position,
         qualityBand: quality + pickInt(-15, 15),
         clubId
@@ -146,7 +158,7 @@ function generateSquad(clubId, opts = {}) {
   }
   // Ensure size
   while (usedPlayers.length < size) {
-    const p = generatePlayer({ nationality: bank, qualityBand: quality - 8, clubId });
+    const p = generatePlayer({ nationality, nameBank: bank, qualityBand: quality - 8, clubId });
     fillPlayerName(p, bank);
     p.shirtNumber = shirtCounter++;
     state.players.push(p);
@@ -161,10 +173,11 @@ function generateSquad(clubId, opts = {}) {
   return usedPlayers;
 }
 
-function generateClub({ name, shortName, leagueId, kitPrimary, kitSecondary, stadiumName, stadiumCapacity, nameBankPref, quality } = {}) {
+function generateClub({ name, shortName, leagueId, kitPrimary, kitSecondary, stadiumName, stadiumCapacity, nameBankPref, nationality, quality } = {}) {
+  const bank = nameBankPref || state.settings.defaultNameBank;
   const c = {
     id: uid('c_'),
-    name: name || generateClubName(nameBankPref || state.settings.defaultNameBank),
+    name: name || generateClubName(bank),
     shortName: shortName || (name ? name.split(' ')[0].slice(0, 3).toUpperCase() : 'CLB'),
     kitPrimary: kitPrimary || randomKitColour(),
     kitSecondary: kitSecondary || '#ffffff',
@@ -174,7 +187,8 @@ function generateClub({ name, shortName, leagueId, kitPrimary, kitSecondary, sta
     viceCaptainId: null,
     formation: DEFAULT_FORMATION,
     tactics: { mentality: 50, tempo: 50, pressing: 50 },
-    nameBankPref: nameBankPref || state.settings.defaultNameBank,
+    nameBankPref: bank,
+    nationality: nationality || state.settings.nation?.name || bankToCountryLabel(bank),
     managerId: null,
     leagueId: leagueId || null,
     reputation: quality || pickInt(40, 70),
@@ -184,14 +198,16 @@ function generateClub({ name, shortName, leagueId, kitPrimary, kitSecondary, sta
   return c;
 }
 
-function generateManager({ nationality, attrs, formerPlayerId } = {}) {
-  nationality = nationality || state.settings.defaultNameBank || 'Generic English';
-  const bank = state.nameBanks[nationality] || DEFAULT_NAME_BANKS[nationality] || DEFAULT_NAME_BANKS['Generic English'];
+function generateManager({ nationality, nameBank, attrs, formerPlayerId } = {}) {
+  nameBank = nameBank || state.settings.defaultNameBank || 'Generic English';
+  nationality = nationality || state.settings.nation?.name || bankToCountryLabel(nameBank);
+  const bank = state.nameBanks[nameBank] || DEFAULT_NAME_BANKS[nameBank] || DEFAULT_NAME_BANKS['Generic English'];
   const m = {
     id: uid('m_'),
     firstName: pick(bank.firstNames),
     lastName: pick(bank.lastNames),
     nationality,
+    nameBankUsed: nameBank,
     attrs: attrs || {
       tactical: pickInt(35, 85),
       manManagement: pickInt(35, 85),
@@ -362,6 +378,12 @@ function selectXI(clubId, formationName) {
     else if (grp === 'DF') r = a.defending * 1.1 + a.strength * 0.7 + a.pace * 0.6 + a.mental * 0.5 + (player.role === role ? 6 : 0);
     else if (grp === 'MF') r = a.passing * 1.0 + a.technique * 0.9 + a.mental * 0.6 + a.defending * (role === 'CDM' ? 0.7 : 0.4) + a.shooting * (role === 'CAM' ? 0.6 : 0.3) + (player.role === role ? 6 : 0);
     else                  r = a.shooting * 1.1 + a.pace * 0.9 + a.technique * 0.8 + a.mental * 0.4 + (player.role === role ? 6 : 0);
+    // Fatigue: subtract a chunk if recently played heavy minutes
+    const fatigue = player.status.fatigue || 0;
+    r -= fatigue * 0.15;
+    // Rotation noise: ±18% so close calls get rotated, but clearly-better
+    // players still keep their place
+    r *= 0.82 + Math.random() * 0.36;
     return r - player.status.suspendedFor * 100;
   };
 
@@ -896,11 +918,21 @@ function commitMatch(draft) {
       historyAppend('player_injured', { playerId: p.id, matches: inj.matches, matchId: draft.id });
     }
   }
-  // Per-player season stats
+  // Per-player season stats + fatigue
+  const playedSet = new Set();
   for (const ap of draft.appearances || []) {
     const p = getPlayer(ap.playerId);
     if (p) {
       p.seasonStats.apps = (p.seasonStats.apps || 0) + 1;
+      p.status.fatigue = clamp((p.status.fatigue || 0) + (ap.minutesPlayed || 0) / 8, 0, 100);
+      playedSet.add(ap.playerId);
+    }
+  }
+  // Bench non-appearance squad rest: decay fatigue for unused squad members
+  for (const cid of [draft.homeId, draft.awayId]) {
+    for (const p of playersByClub(cid)) {
+      if (!p || playedSet.has(p.id) || p.isRetired) continue;
+      p.status.fatigue = Math.max(0, (p.status.fatigue || 0) - 5);
     }
   }
   for (const sc of draft.scorers || []) {
@@ -1200,6 +1232,7 @@ function endOfSeasonProcessing() {
     p.seasonStats = { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
     p.status.yellowsThisSeason = 0;
     p.status.suspendedFor = 0;
+    p.status.fatigue = 0;
     if (p.status.injuredUntil > 0) p.status.injuredUntil = Math.max(0, p.status.injuredUntil - 38);
     // Slight ageing curve: peak 27-29, decline after 30
     const dec = p.position === 'GK' ? Math.max(0, p.age - 36) : Math.max(0, p.age - 30);
@@ -1240,7 +1273,13 @@ function endOfSeasonProcessing() {
     const intake = pickInt(2, 5);
     const newIds = [];
     for (let i = 0; i < intake; i++) {
-      const np = generatePlayer({ nationality: club.nameBankPref, qualityBand: 35 + pickInt(0, 30), ageBand: 'youth', clubId: club.id });
+      const np = generatePlayer({
+        nationality: club.nationality || state.settings.nation?.name || bankToCountryLabel(club.nameBankPref),
+        nameBank: club.nameBankPref,
+        qualityBand: 35 + pickInt(0, 30),
+        ageBand: 'youth',
+        clubId: club.id
+      });
       fillPlayerName(np, club.nameBankPref);
       np.shirtNumber = nextFreeShirtNumber(club.id);
       state.players.push(np);
@@ -1274,6 +1313,9 @@ function endOfSeasonProcessing() {
   for (const club of state.clubs) {
     if (!club.managerId) hireManagerForClub(club.id);
   }
+
+  // AI transfer window
+  runAITransferWindow();
 
   // Reset cups; rebuild league schedules
   for (const lg of state.leagues) {
@@ -1338,6 +1380,78 @@ function sackManager(clubId, reason) {
   mgr.isUnemployed = true;
   mgr.seasonsAtClub = 0;
   club.managerId = null;
+}
+
+/* ===========================================================================
+ * AI transfer window — runs once per off-season after youth intake.
+ *
+ *   For each club we identify the weakest XI position by overall, then
+ *   look across all other clubs for an upgrade. Higher-tier and higher-
+ *   reputation clubs poach more aggressively. Total transfers per window
+ *   is bounded by `maxMoves` to keep things believable.
+ * ========================================================================= */
+function runAITransferWindow(maxMoves = null) {
+  const totalCap = maxMoves != null ? maxMoves : Math.max(8, Math.floor(state.clubs.length * 1.2));
+  let moves = 0;
+  // Order clubs by reputation high→low so big clubs pick first
+  const orderedClubs = state.clubs.slice().sort((a, b) => (b.reputation || 50) - (a.reputation || 50));
+  for (const club of orderedClubs) {
+    if (moves >= totalCap) break;
+    if (Math.random() < 0.35) continue; // not every club moves every window
+    const squad = playersByClub(club.id).filter(p => !p.isRetired);
+    if (squad.length < 11) continue;
+    const xi = selectXI(club.id);
+    if (!xi || !xi.slots.length) continue;
+    // Pick the lowest-rated starter as the upgrade target
+    const xiPlayers = xi.slots
+      .map(s => ({ slot: s, p: getPlayer(s.playerId) }))
+      .filter(x => x.p);
+    if (!xiPlayers.length) continue;
+    xiPlayers.sort((a, b) => playerOverall(a.p) - playerOverall(b.p));
+    const weakest = xiPlayers[0];
+    if (!weakest || !weakest.p) continue;
+    const targetGroup = ROLE_TO_GROUP[weakest.slot.role];
+    const myThreshold = playerOverall(weakest.p) + 4;
+
+    // Search candidates from other clubs at same position with better overall
+    const candidates = state.players.filter(p =>
+      !p.isRetired && p.clubId && p.clubId !== club.id && p.position === weakest.p.position &&
+      playerOverall(p) >= myThreshold &&
+      p.age <= 32
+    );
+    if (!candidates.length) continue;
+    candidates.sort((a, b) => playerOverall(b) - playerOverall(a));
+
+    // Pick a candidate. Higher-rep clubs poach from peers; smaller clubs
+    // mostly fish in lower-rep waters.
+    let chosen = null;
+    for (const cand of candidates) {
+      const candClub = getClub(cand.clubId);
+      if (!candClub) continue;
+      // Captains and vice-captains are unlikely to leave their current club
+      if (candClub.captainId === cand.id) {
+        if (Math.random() > 0.05) continue;
+      } else if (candClub.viceCaptainId === cand.id) {
+        if (Math.random() > 0.15) continue;
+      }
+      // Reputation gate: hiring club must be at least roughly on par with
+      // selling club, otherwise selling club refuses
+      const repGap = (candClub.reputation || 50) - (club.reputation || 50);
+      if (repGap > 8 && Math.random() > 0.10) continue; // selling club refuses
+      // Probabilistic acceptance: sometimes the move just doesn't happen
+      if (Math.random() > 0.55) continue;
+      chosen = cand;
+      break;
+    }
+    if (!chosen) continue;
+
+    const fee = Math.round((playerOverall(chosen) ** 1.6) * 1000 + pickInt(0, 500000));
+    transferPlayer(chosen.id, club.id, fee, false);
+    moves++;
+  }
+  // Free agent re-signings: any clubless retired-but-active (rare edge case)
+  // — currently no such pool, so skip.
+  return moves;
 }
 
 /* ===========================================================================

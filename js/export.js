@@ -321,6 +321,23 @@ function compileNewsItems(maxItems = 30) {
         text = templ(pick(NEWS_TEMPLATES.youthIntake), { club: c.name, n: (e.playerIds || []).length });
         break;
       }
+      case 'player_signed': {
+        const p = getPlayer(e.playerId);
+        if (!p) break;
+        const fromClub = e.fromClubId ? getClub(e.fromClubId) : null;
+        const toClub = e.toClubId ? getClub(e.toClubId) : null;
+        if (toClub && fromClub) {
+          if (e.freeTransfer) text = templ(pick(NEWS_TEMPLATES.transferFree), { player: p.name, club: toClub.name, fromClub: fromClub.name });
+          else text = templ(pick(NEWS_TEMPLATES.transferIn), { player: p.name, club: toClub.name, fromClub: fromClub.name, fee: '£' + (e.fee || 0).toLocaleString() });
+          severity = 'major';
+        } else if (toClub && !fromClub) {
+          text = templ(pick(NEWS_TEMPLATES.transferFree), { player: p.name, club: toClub.name, fromClub: 'free agency' });
+        } else if (!toClub && fromClub) {
+          text = templ(pick(NEWS_TEMPLATES.released), { player: p.name, fromClub: fromClub.name });
+          severity = 'warn';
+        }
+        break;
+      }
       case 'player_injured': {
         const p = getPlayer(e.playerId);
         if (!p) break;

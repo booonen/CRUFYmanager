@@ -347,6 +347,18 @@ const NEWS_TEMPLATES = {
   yellowBan: [
     '{player} suspended for one match after a fifth yellow card.',
   ],
+  transferIn: [
+    '{club} sign {player} from {fromClub} for {fee}.',
+    '{player} joins {club} from {fromClub} ({fee}).',
+    '{club} swoop for {fromClub}\'s {player}.',
+  ],
+  transferFree: [
+    '{player} joins {club} on a free transfer.',
+    '{club} sign {player} on a Bosman.',
+  ],
+  released: [
+    '{player} released by {fromClub}.',
+  ],
 };
 
 const SUBSTITUTION_REASONS = ['Tactical', 'Tired legs', 'Off the pace', 'Injury', 'Disciplinary'];
@@ -377,6 +389,14 @@ function templ(str, vars) {
 function generatePlayerName(bankName) {
   const bank = (state && state.nameBanks && state.nameBanks[bankName]) || DEFAULT_NAME_BANKS[bankName] || DEFAULT_NAME_BANKS['Generic English'];
   return `${pick(bank.firstNames)} ${pick(bank.lastNames)}`;
+}
+
+/* Convert a name-bank label like "Generic English" to a country-ish display
+ * label "English" — used as a fallback when no nation is configured. */
+function bankToCountryLabel(bankName) {
+  if (!bankName) return '';
+  if (bankName.startsWith('Generic ')) return bankName.slice(8);
+  return bankName;
 }
 
 function generateClubName(bankName) {
