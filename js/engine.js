@@ -97,6 +97,7 @@ function generatePlayer({ nationality, nameBank, position, role, ageBand, qualit
     contract: { wage: pickInt(50, 500) * 10, years: pickInt(1, 5) },
     status: { injuredUntil: 0, suspendedFor: 0, yellowsThisSeason: 0, fatigue: 0 },
     seasonStats: { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 },
+    skillHistory: [],
     isRetired: false,
   };
 }
@@ -1330,6 +1331,27 @@ function endOfSeasonProcessing() {
     cp._currentRound = null;
   }
 
+  // Snapshot player skill history (overall + raw attrs) for non-retired players
+  for (const p of state.players) {
+    if (p.isRetired) continue;
+    if (!p.skillHistory) p.skillHistory = [];
+    p.skillHistory.push({
+      season: state.settings.season,
+      age: p.age,
+      overall: playerOverall(p),
+      pace: p.attrs.pace,
+      strength: p.attrs.strength,
+      technique: p.attrs.technique,
+      passing: p.attrs.passing,
+      defending: p.attrs.defending,
+      shooting: p.attrs.shooting,
+      mental: p.attrs.mental,
+      goalkeeping: p.attrs.goalkeeping,
+    });
+    // Cap at 30 entries
+    if (p.skillHistory.length > 30) p.skillHistory = p.skillHistory.slice(-30);
+  }
+
   // Bump season
   state.settings.season += 1;
   saveState();
@@ -1452,6 +1474,246 @@ function runAITransferWindow(maxMoves = null) {
   // Free agent re-signings: any clubless retired-but-active (rare edge case)
   // — currently no such pool, so skip.
   return moves;
+}
+
+/* ===========================================================================
+ * Scripted match — for the External Matches generator. Caller provides
+ * both XIs plus a target final score; engine fills in plausible events,
+ * scorers, cards, and stats that fit the scoreline.
+ *
+ *   homeXI / awayXI: { formation, slots: [{ role, x, y, player: { id?, name,
+ *                       position, role, attrs:{...} } }] }
+ *   scoring:         { hScore, aScore, hPenScore?, aPenScore? }
+ *
+ *   Returns a match-shaped object with isExternal: true.
+ * ========================================================================= */
+function scriptedMatch({
+  homeName, awayName, homeXI, awayXI,
+  hScore, aScore, hPenScore, aPenScore,
+  type = 'NT friendly', competition = '', neutral = true,
+  goesToET = false, goesToPens = false,
+}) {
+  const stoppage = pickInt(2, 6);
+  const totalMin = 90 + stoppage;
+  const events = [];
+  events.push({ minute: 0, type: 'kickoff', icon: '', text: templ(pick(COMMENTARY.kickoff), { hometeam: homeName, awayteam: awayName, stadium: 'a neutral venue', attendance: pickInt(15000, 80000).toLocaleString() }) });
+
+  // Pick goal-scorers and minutes
+  const scorers = [];
+  const hPlayers = (homeXI?.slots || []).map(s => s.player).filter(Boolean);
+  const aPlayers = (awayXI?.slots || []).map(s => s.player).filter(Boolean);
+  if (!hPlayers.length || !aPlayers.length) {
+    showToast('Both XIs need at least one player', 'error');
+    return null;
+  }
+  const goalEvents = [];
+  for (let i = 0; i < hScore; i++) goalEvents.push({ side: 'home' });
+  for (let i = 0; i < aScore; i++) goalEvents.push({ side: 'away' });
+  shuffle(goalEvents);
+  // Assign unique minutes biased toward second half a touch
+  const usedMins = new Set();
+  for (const g of goalEvents) {
+    let m;
+    let safety = 0;
+    do { m = rand() < 0.55 ? pickInt(46, totalMin - 1) : pickInt(2, 45); safety++; }
+    while (usedMins.has(m) && safety < 200);
+    usedMins.add(m);
+    g.minute = m;
+  }
+  goalEvents.sort((a, b) => a.minute - b.minute);
+
+  for (const g of goalEvents) {
+    const xi = g.side === 'home' ? hPlayers : aPlayers;
+    const weights = xi.map(p => Math.max((p.attrs?.shooting || 50) + (p.position === 'FW' ? 35 : p.position === 'MF' ? 12 : 0), 1));
+    const scorer = weightedPick(xi, weights) || xi[0];
+    const isPenalty = rand() < 0.10;
+    const isOG = !isPenalty && rand() < 0.03;
+    let assister = null;
+    if (!isPenalty && !isOG && rand() < 0.7) {
+      const others = xi.filter(p => p !== scorer);
+      if (others.length) {
+        const aw = others.map(p => Math.max((p.attrs?.passing || 50) + (p.attrs?.technique || 50), 1));
+        assister = weightedPick(others, aw);
+      }
+    }
+    let owningSide = g.side;
+    let credited = scorer;
+    if (isOG) {
+      // Own goal: credited goal goes to opposing side, named scorer is on g.side
+      owningSide = g.side === 'home' ? 'away' : 'home';
+      // (In our schema we record `side` as the side that scored, plus ownGoal flag with the scorer's actual team)
+    }
+    scorers.push({
+      playerId: scorer.id || null,
+      playerName: scorer.name,
+      side: g.side,                  // side credited with the goal
+      ownGoalSide: isOG ? (g.side === 'home' ? 'away' : 'home') : null,
+      minute: g.minute,
+      ownGoal: isOG,
+      penalty: isPenalty,
+      assistId: assister?.id || null,
+      assistName: assister?.name || null,
+    });
+    let text;
+    if (isPenalty) text = templ(pick(COMMENTARY.penaltyScored), { scorer: scorer.name });
+    else if (isOG) text = `${scorer.name} turns the ball into his own net.`;
+    else if (assister) text = templ(pick(COMMENTARY.goalAssist), { scorer: scorer.name, assister: assister.name });
+    else text = templ(pick(COMMENTARY.goal), { scorer: scorer.name });
+    events.push({ minute: g.minute, type: isPenalty ? 'penalty' : 'goal', side: g.side, icon: '⚽', text });
+  }
+
+  // Cards: 2-5 yellows + occasional red
+  const cards = [];
+  const numCards = pickInt(2, 5);
+  const cardMins = new Set();
+  for (let i = 0; i < numCards; i++) {
+    const side = rand() < 0.5 ? 'home' : 'away';
+    const xi = side === 'home' ? hPlayers : aPlayers;
+    const cands = xi.filter(p => p.position !== 'GK');
+    if (!cands.length) continue;
+    const fouler = pick(cands);
+    let m;
+    let safety = 0;
+    do { m = pickInt(8, totalMin - 4); safety++; } while (cardMins.has(m) && safety < 100);
+    cardMins.add(m);
+    cards.push({ playerId: fouler.id || null, playerName: fouler.name, side, type: 'yellow', minute: m, reason: 'foul' });
+    events.push({ minute: m, type: 'yellow', side, icon: '▪', text: templ(pick(COMMENTARY.yellow), { fouler: fouler.name, fouled: 'an opponent' }) });
+  }
+  if (rand() < 0.10) {
+    const side = rand() < 0.5 ? 'home' : 'away';
+    const xi = side === 'home' ? hPlayers : aPlayers;
+    const cands = xi.filter(p => p.position !== 'GK');
+    if (cands.length) {
+      const fouler = pick(cands);
+      const m = pickInt(20, totalMin);
+      cards.push({ playerId: fouler.id || null, playerName: fouler.name, side, type: 'red', minute: m, reason: 'direct_red' });
+      events.push({ minute: m, type: 'red', side, icon: '■', text: templ(pick(COMMENTARY.red), { fouler: fouler.name, fouled: 'an opponent' }) });
+    }
+  }
+
+  // Half-time + full-time markers
+  let hAtHT = 0, aAtHT = 0;
+  for (const sc of scorers) if (sc.minute <= 45) { if (sc.side === 'home') hAtHT++; else aAtHT++; }
+  events.push({ minute: 45, type: 'halftime', icon: '', text: templ(pick(COMMENTARY.halftime), { hometeam: homeName, awayteam: awayName, hs: hAtHT, as: aAtHT }) });
+  events.push({ minute: totalMin, type: 'fulltime', icon: '', text: templ(pick(COMMENTARY.fulltime), { hometeam: homeName, awayteam: awayName, hs: hScore, as: aScore }) });
+
+  let extraTime = null;
+  let penalties = null;
+  if (goesToET) extraTime = { homeGoals: hScore, awayGoals: aScore };
+  if (goesToPens && hPenScore != null && aPenScore != null) {
+    penalties = { homeKicks: hPenScore, awayKicks: aPenScore, kicks: [] };
+    events.push({ minute: 121, type: 'penalties', icon: '', text: `Penalty shootout: ${homeName} ${hPenScore} – ${aPenScore} ${awayName}` });
+  }
+
+  events.sort((a, b) => a.minute - b.minute);
+
+  // Compose stats
+  const avgRating = list => {
+    if (!list || !list.length) return 50;
+    return list.reduce((acc, p) => {
+      const a = p.attrs || {};
+      return acc + ((a.shooting||50) + (a.defending||50) + (a.passing||50) + (a.mental||50)) / 4;
+    }, 0) / list.length;
+  };
+  const hStr = avgRating(hPlayers);
+  const aStr = avgRating(aPlayers);
+  const total = hStr + aStr;
+  const possessionH = Math.round(hStr / total * 100);
+  const possessionA = 100 - possessionH;
+  const shotsH = Math.max(hScore + pickInt(0, 3), pickInt(8, 18));
+  const shotsA = Math.max(aScore + pickInt(0, 3), pickInt(8, 18));
+  const stats = {
+    possessionH, possessionA,
+    shotsH, shotsA,
+    sotH: Math.max(hScore, Math.round(shotsH * 0.4)),
+    sotA: Math.max(aScore, Math.round(shotsA * 0.4)),
+    cornersH: pickInt(3, 9), cornersA: pickInt(3, 9),
+    foulsH: pickInt(8, 16), foulsA: pickInt(8, 16),
+    yellowsH: cards.filter(c => c.side === 'home' && c.type === 'yellow').length,
+    yellowsA: cards.filter(c => c.side === 'away' && c.type === 'yellow').length,
+    redsH: cards.filter(c => c.side === 'home' && c.type === 'red').length,
+    redsA: cards.filter(c => c.side === 'away' && c.type === 'red').length,
+  };
+
+  return {
+    id: uid('em_'),
+    season: state.settings.season,
+    type, competition,
+    homeName, awayName,
+    homeFormation: homeXI?.formation || null,
+    awayFormation: awayXI?.formation || null,
+    homeXI, awayXI,
+    hScore, aScore,
+    extraTime, penalties,
+    events, scorers, cards,
+    injuries: [], subs: [],
+    appearances: [
+      ...hPlayers.map(p => ({ playerId: p.id || null, playerName: p.name, side: 'home', minutesPlayed: totalMin, started: true })),
+      ...aPlayers.map(p => ({ playerId: p.id || null, playerName: p.name, side: 'away', minutesPlayed: totalMin, started: true })),
+    ],
+    stats, stoppage,
+    isExternal: true,
+    ts: Date.now(),
+  };
+}
+
+/* Build a synthetic 11-player XI from a strength target, formation, and
+ * optional name bank. Used for "Custom" external opponents. */
+function synthesizeXI({ formation = DEFAULT_FORMATION, strength = 60, nameBank = 'Generic English', nationality = '', teamName = 'Custom XI' }) {
+  const formSlots = FORMATIONS[formation] || FORMATIONS[DEFAULT_FORMATION];
+  const bank = (state && state.nameBanks && state.nameBanks[nameBank]) || DEFAULT_NAME_BANKS[nameBank] || DEFAULT_NAME_BANKS['Generic English'];
+  const slots = formSlots.map((f, i) => {
+    const grp = ROLE_TO_GROUP[f.role];
+    const attr = (mean, w = 1) => clamp(Math.round(randNorm(mean * w, 8)), 1, 99);
+    let attrs;
+    if (grp === 'GK') attrs = { pace: attr(strength, 0.6), strength: attr(strength, 0.85), technique: attr(strength, 0.55), passing: attr(strength, 0.65), defending: attr(strength, 0.5), shooting: attr(strength, 0.2), mental: attr(strength, 0.95), goalkeeping: attr(strength, 1.15) };
+    else if (grp === 'DF') attrs = { pace: attr(strength, 0.95), strength: attr(strength, 1.0), technique: attr(strength, 0.75), passing: attr(strength, 0.85), defending: attr(strength, 1.15), shooting: attr(strength, 0.4), mental: attr(strength, 0.9), goalkeeping: 5 };
+    else if (grp === 'MF') attrs = { pace: attr(strength, 0.9), strength: attr(strength, 0.85), technique: attr(strength, 1.05), passing: attr(strength, 1.1), defending: attr(strength, 0.7), shooting: attr(strength, 0.85), mental: attr(strength, 0.95), goalkeeping: 5 };
+    else attrs = { pace: attr(strength, 1.1), strength: attr(strength, 1.0), technique: attr(strength, 1.05), passing: attr(strength, 0.85), defending: attr(strength, 0.45), shooting: attr(strength, 1.15), mental: attr(strength, 0.9), goalkeeping: 5 };
+    return {
+      role: f.role, x: f.x, y: f.y,
+      player: {
+        id: null,
+        name: `${pick(bank.firstNames)} ${pick(bank.lastNames)}`,
+        position: grp,
+        role: f.role,
+        nationality,
+        shirtNumber: i + 1,
+        attrs,
+      }
+    };
+  });
+  return { formation, slots };
+}
+
+/* Auto-pick best XI from a candidate pool of player IDs, given a formation. */
+function autoPickXIFromPool(playerIds, formation = DEFAULT_FORMATION) {
+  const formSlots = FORMATIONS[formation] || FORMATIONS[DEFAULT_FORMATION];
+  const pool = playerIds.map(getPlayer).filter(Boolean).filter(p => !p.isRetired);
+  const used = new Set();
+  const slots = formSlots.map(f => ({ ...f, player: null }));
+  const rateForRole = (player, role) => {
+    const a = player.attrs;
+    const grp = ROLE_TO_GROUP[role];
+    if (player.position === 'GK' && grp !== 'GK') return -1;
+    if (player.position !== 'GK' && grp === 'GK') return -1;
+    let r = 0;
+    if (grp === 'GK') r = a.goalkeeping * 1.3 + a.mental * 0.4;
+    else if (grp === 'DF') r = a.defending * 1.1 + a.strength * 0.7 + a.pace * 0.6 + a.mental * 0.5 + (player.role === role ? 6 : 0);
+    else if (grp === 'MF') r = a.passing + a.technique * 0.9 + a.mental * 0.6 + (player.role === role ? 6 : 0);
+    else r = a.shooting * 1.1 + a.pace * 0.9 + a.technique * 0.8 + (player.role === role ? 6 : 0);
+    return r;
+  };
+  for (const slot of slots) {
+    let best = null, bestScore = -Infinity;
+    for (const p of pool) {
+      if (used.has(p.id)) continue;
+      const s = rateForRole(p, slot.role);
+      if (s > bestScore) { bestScore = s; best = p; }
+    }
+    if (best) { slot.player = best; used.add(best.id); }
+  }
+  return { formation, slots };
 }
 
 /* ===========================================================================

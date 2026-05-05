@@ -204,6 +204,66 @@ function bbcodeMatchdayResults(leagueId, matchday) {
 }
 
 /* ===========================================================================
+ * External match report (NT, continental, friendlies)
+ * ========================================================================= */
+function bbcodeExternalMatchReport(m) {
+  if (!m) return '';
+  let s = '';
+  s += bbcodeNationHeader();
+  let scoreStr = `${m.hScore} – ${m.aScore}`;
+  if (m.extraTime) scoreStr += ' (a.e.t.)';
+  if (m.penalties) scoreStr += ` (${m.penalties.homeKicks}–${m.penalties.awayKicks} pens)`;
+  s += bbCentre(bbSize(140, `${bbBold(m.homeName)} ${bbColour(BB_ACCENT, scoreStr)} ${bbBold(m.awayName)}`)) + '\n';
+  const meta = [m.type, m.competition, `Season ${m.season}`].filter(Boolean);
+  s += bbCentre(bbSize(85, bbColour(BB_DIM, meta.join(' · ')))) + '\n[hr]\n';
+
+  // Scorers
+  const homeScorers = (m.scorers || []).filter(sc => sc.side === 'home');
+  const awayScorers = (m.scorers || []).filter(sc => sc.side === 'away');
+  if (homeScorers.length || awayScorers.length) {
+    s += `[table][tr][td]${bbBold(m.homeName)}[/td][td]${bbBold(m.awayName)}[/td][/tr]\n`;
+    const fmt = sc => `${sc.playerName || playerName(sc.playerId)} ${sc.minute}'${sc.penalty ? ' (P)' : ''}${sc.ownGoal ? ' (OG)' : ''}`;
+    s += `[tr][td]${homeScorers.map(fmt).join('[br]')}[/td][td]${awayScorers.map(fmt).join('[br]')}[/td][/tr][/table]\n\n`;
+  }
+
+  // Stats summary
+  const st = m.stats || {};
+  s += bbBold('Match statistics') + '\n[table]\n';
+  const statRow = (l, h, a) => `[tr][td]${h}[/td][td]${bbBold(l)}[/td][td]${a}[/td][/tr]\n`;
+  s += statRow('Possession', `${st.possessionH ?? '-'}%`, `${st.possessionA ?? '-'}%`);
+  s += statRow('Shots', st.shotsH ?? '-', st.shotsA ?? '-');
+  s += statRow('On target', st.sotH ?? '-', st.sotA ?? '-');
+  s += statRow('Yellows', st.yellowsH ?? 0, st.yellowsA ?? 0);
+  if ((st.redsH || 0) + (st.redsA || 0) > 0) s += statRow('Reds', st.redsH ?? 0, st.redsA ?? 0);
+  s += '[/table]\n\n';
+
+  // Lineups
+  if (m.homeXI && m.awayXI) {
+    s += bbBold('Lineups') + '\n';
+    s += bbcodeExternalLineup(m.homeName, m.homeXI) + '\n';
+    s += bbcodeExternalLineup(m.awayName, m.awayXI) + '\n';
+  }
+
+  // Match events
+  s += bbBold('Match events') + '\n';
+  s += bbcodeCommentaryList(m.events) + '\n';
+
+  return s.trim();
+}
+
+function bbcodeExternalLineup(teamName, xi) {
+  if (!xi || !xi.slots) return '';
+  let s = `${bbBold(teamName)} (${xi.formation})\n[list]`;
+  for (const slot of xi.slots) {
+    const p = slot.player;
+    if (!p) continue;
+    s += `[*]${slot.role}: ${p.shirtNumber ? `#${p.shirtNumber} ` : ''}${p.name}`;
+  }
+  s += '[/list]';
+  return s;
+}
+
+/* ===========================================================================
  * Cup bracket
  * ========================================================================= */
 function bbcodeCupBracket(cupId) {

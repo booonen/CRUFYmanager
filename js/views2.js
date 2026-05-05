@@ -310,12 +310,35 @@ function renderExternal() {
   const root = document.getElementById('external-content');
   if (!root) return;
   const list = state.externalMatches || [];
-  if (!list.length) { root.innerHTML = emptyState({ icon: '⟶', title: 'No external matches', body: 'Add NT friendlies, qualifiers, or continental club ties to keep your record straight.', cta: `<button class="btn btn-primary" onclick="openExternalModal()">+ Add External</button>` }); return; }
-  let html = `<table class="data-table"><thead><tr><th class="num-c">Season</th><th>Type</th><th>Home</th><th class="num-c">Score</th><th>Away</th><th>Comp.</th><th class="actions-cell"></th></tr></thead><tbody>`;
-  for (const m of list.slice().reverse()) {
-    html += `<tr><td class="num-c">${m.season}</td><td>${esc(m.type)}</td><td>${esc(m.homeName)}</td><td class="num-c"><strong>${m.hScore}–${m.aScore}</strong></td><td>${esc(m.awayName)}</td><td>${esc(m.competition || '')}</td><td class="actions-cell"><button class="btn btn-sm btn-danger" onclick="deleteExternal('${m.id}')">✕</button></td></tr>`;
+  if (!list.length) {
+    root.innerHTML = emptyState({
+      icon: '⟶',
+      title: 'No external matches',
+      body: 'Generate scripted matches for NT friendlies, qualifiers, continental club ties, or any one-off you need a match report for. You provide the final score; the engine fills in the narrative.',
+      cta: `<button class="btn btn-primary" onclick="openExternalModal()">⚡ Generate match</button>`
+    });
+    return;
   }
-  html += `</tbody></table>`;
+  // Group by season
+  const bySeason = {};
+  for (const m of list) (bySeason[m.season] = bySeason[m.season] || []).push(m);
+  let html = '';
+  const seasons = Object.keys(bySeason).map(Number).sort((a, b) => b - a);
+  for (const sn of seasons) {
+    html += `<h3 style="font-family:var(--font-display);margin:18px 0 8px">Season ${sn}</h3>`;
+    const matches = bySeason[sn].slice().reverse();
+    for (const m of matches) {
+      const subtitle = [m.type, m.competition].filter(Boolean).join(' · ');
+      let pen = '';
+      if (m.penalties) pen = `<span class="pen-detail">${m.penalties.homeKicks}–${m.penalties.awayKicks} pens</span>`;
+      else if (m.extraTime) pen = `<span class="pen-detail">a.e.t.</span>`;
+      html += `<div class="scoreline scoreline-committed" onclick="viewMatchModal('${m.id}')" style="cursor:pointer">
+        <div class="home-team">${esc(m.homeName)}<div class="text-muted" style="font-size:11px">${esc(subtitle)}</div></div>
+        <div class="score">${m.hScore}–${m.aScore}${pen}</div>
+        <div class="away-team">${esc(m.awayName)}</div>
+      </div>`;
+    }
+  }
   root.innerHTML = html;
 }
 

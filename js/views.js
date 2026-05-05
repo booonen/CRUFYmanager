@@ -548,6 +548,7 @@ function renderPlayerDetailHTML(id) {
         ${attrBar('Potential', p.potential)}
         ${attrBar('Injury proneness', p.injuryProneness)}
       </div>
+      <div class="card mb-16"><h3>Skill over time</h3>${renderPlayerSkillChartHTML(p)}</div>
       <div class="card mb-16"><h3>Career by season</h3>${renderPlayerCareerHTML(id, career)}</div>
       <div class="card mb-16"><h3>Match log <span class="text-muted" style="font-size:12px;font-weight:400">most recent first</span></h3>${renderPlayerMatchLogHTML(id)}</div>
       <div class="card mb-16"><h3>Player history <span class="text-muted" style="font-size:12px;font-weight:400">all events touching this player</span></h3>${renderPlayerLedgerHTML(id)}</div>
@@ -579,6 +580,36 @@ function renderPlayerDetailHTML(id) {
     </div>
   </div>`;
   return html;
+}
+
+function renderPlayerSkillChartHTML(player) {
+  const hist = player.skillHistory || [];
+  // Always include the live current rating as the trailing data point.
+  const live = { season: state.settings.season, age: player.age, overall: playerOverall(player) };
+  const data = [...hist, live];
+  if (data.length < 2) return `<p class="text-muted" style="font-size:12px">No history yet — ratings will be snapshotted at the end of each season. Current overall: <strong>${playerOverall(player)}</strong>.</p>`;
+  const w = 360, h = 140, padL = 32, padR = 12, padT = 12, padB = 22;
+  const lo = Math.max(1, Math.min(...data.map(d => d.overall)) - 4);
+  const hi = Math.min(99, Math.max(...data.map(d => d.overall), player.potential || 99) + 2);
+  const xFor = (i) => padL + (i / (data.length - 1)) * (w - padL - padR);
+  const yFor = (v) => h - padB - ((v - lo) / (hi - lo)) * (h - padT - padB);
+  const points = data.map((d, i) => `${xFor(i).toFixed(1)},${yFor(d.overall).toFixed(1)}`).join(' ');
+  // Reference line: hidden potential
+  const potY = yFor(Math.min(99, player.potential || 99));
+  // Y-axis labels
+  const yTicks = [lo, Math.round((lo + hi) / 2), hi];
+  const yTicksHTML = yTicks.map(v => `<text x="${padL - 6}" y="${(yFor(v) + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-muted)" font-family="var(--font-mono)">${v}</text><line x1="${padL}" x2="${w - padR}" y1="${yFor(v).toFixed(1)}" y2="${yFor(v).toFixed(1)}" stroke="var(--border)" stroke-dasharray="2 3"/>`).join('');
+  const xTicksHTML = data.map((d, i) => `<text x="${xFor(i).toFixed(1)}" y="${h - 6}" text-anchor="middle" font-size="10" fill="var(--text-muted)" font-family="var(--font-mono)">S${d.season}</text>`).join('');
+  const dots = data.map((d, i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(d.overall).toFixed(1)}" r="3.5" fill="var(--accent)"><title>S${d.season} (age ${d.age}): Ovr ${d.overall}</title></circle>`).join('');
+  return `<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:8px"><div class="text-muted" style="font-size:12px">${data.length} data point${data.length === 1 ? '' : 's'}; potential cap ${player.potential}</div><div class="text-muted" style="font-size:11px">delta: ${data[0].overall} → ${data[data.length-1].overall} (${data[data.length-1].overall - data[0].overall >= 0 ? '+' : ''}${data[data.length-1].overall - data[0].overall})</div></div>
+  <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block">
+    ${yTicksHTML}
+    <line x1="${padL}" x2="${w - padR}" y1="${potY.toFixed(1)}" y2="${potY.toFixed(1)}" stroke="var(--warn)" stroke-dasharray="3 3" opacity="0.6"/>
+    <text x="${w - padR}" y="${(potY - 4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--warn)" font-family="var(--font-mono)">potential ${player.potential}</text>
+    <polyline points="${points}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    ${dots}
+    ${xTicksHTML}
+  </svg>`;
 }
 
 function renderPlayerCareerHTML(playerId, career) {

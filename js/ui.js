@@ -256,15 +256,21 @@ function viewMatchModal(matchOrEventId, opts = {}) {
       const draft = (state.draftMatches || []).find(d => d.id === matchOrEventId);
       if (draft) { m = draft; opts.draft = true; }
     }
+    if (!m) {
+      const ext = (state.externalMatches || []).find(e => e.id === matchOrEventId);
+      if (ext) { m = ext; opts.external = true; }
+    }
   } else m = matchOrEventId;
   if (!m) return;
-  const home = getClub(m.homeId);
-  const away = getClub(m.awayId);
+  // External matches don't have club IDs — synthesize lightweight stand-ins
+  const isExternalView = opts.external || m.isExternal;
+  const home = isExternalView ? { name: m.homeName || '?', stadiumName: '', formation: m.homeFormation || '' } : getClub(m.homeId);
+  const away = isExternalView ? { name: m.awayName || '?', stadiumName: '', formation: m.awayFormation || '' } : getClub(m.awayId);
   if (!home || !away) return;
 
   const leagueLine = m.leagueId
     ? `${getLeague(m.leagueId)?.name || '?'} · Matchday ${m.matchday}`
-    : (m.cupId ? `${getCup(m.cupId)?.name || '?'}` : '');
+    : (m.cupId ? `${getCup(m.cupId)?.name || '?'}` : (isExternalView ? `${m.type || 'External'}${m.competition ? ' · ' + m.competition : ''}` : ''));
 
   let body = `<div class="match-report">
     <div class="match-report-header">
@@ -312,6 +318,12 @@ function viewMatchModal(matchOrEventId, opts = {}) {
       <button class="btn" onclick="(()=>{ discardDraftMatch('${m.id}'); closeModal(); refreshAll(); })()">Discard</button>
       <button class="btn btn-warn" onclick="rerollDraft('${m.id}')">Re-roll</button>
       <button class="btn btn-primary" onclick="(()=>{ commitMatch(state.draftMatches.find(d=>d.id==='${m.id}')); closeModal(); refreshAll(); showToast('Match committed to history','success'); })()">Commit to history</button>
+    `;
+  } else if (opts.external) {
+    footer = `
+      <button class="btn" onclick="copyToClipboard(bbcodeExternalMatchReport(state.externalMatches.find(e=>e.id==='${m.id}')))">Copy BBCode</button>
+      <button class="btn btn-danger" onclick="if(confirm('Delete this external match?')) { deleteExternal('${m.id}'); closeModal(); }">Delete</button>
+      <button class="btn" onclick="closeModal()">Close</button>
     `;
   } else {
     footer = `

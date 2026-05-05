@@ -12,6 +12,7 @@ const STATE_KEY = 'crufy_save_v1';   // legacy localStorage key (migrated on loa
 const DB_NAME = 'crufy';
 const DB_VERSION = 1;
 const STORE = 'saves';
+const NAMEBANK_KEY = 'nameBanks';      // separate IDB key, preserved across resets
 const SCHEMA_VERSION = 1;
 
 let state = null;
@@ -138,9 +139,20 @@ async function loadState() {
       }
     } catch (e) { /* ignore */ }
   }
-  if (!raw) { state = defaultState(); return state; }
-  try { state = migrateState(raw); }
-  catch (e) { console.warn('Failed to migrate save, starting fresh', e); state = defaultState(); }
+  if (!raw) state = defaultState();
+  else { try { state = migrateState(raw); }
+         catch (e) { console.warn('Failed to migrate save, starting fresh', e); state = defaultState(); } }
+
+  // 3) Load name-banks library (kept separate from main save). If the user
+  // has an established library, it overrides whatever was in the save; if
+  // not, persist the save's banks (which start as defaults) into the library.
+  let lib = null;
+  try { lib = await _idbGet(NAMEBANK_KEY); } catch (e) { /* ignore */ }
+  if (lib && Object.keys(lib).length) {
+    state.nameBanks = lib;
+  } else if (state.nameBanks && Object.keys(state.nameBanks).length) {
+    try { await _idbPut(NAMEBANK_KEY, state.nameBanks); } catch (e) { /* ignore */ }
+  }
   return state;
 }
 
@@ -198,7 +210,12 @@ function saveStateNow() {
   if (_saveInFlight) { _saveQueued = true; return Promise.resolve(); }
   _saveInFlight = true;
   const snapshot = state;
-  return _idbPut('main', snapshot).catch(err => {
+  // Mirror name banks to their separate IDB key so they survive save resets.
+  const banksSnapshot = snapshot.nameBanks;
+  return Promise.all([
+    _idbPut('main', snapshot),
+    banksSnapshot ? _idbPut(NAMEBANK_KEY, banksSnapshot) : Promise.resolve(),
+  ]).catch(err => {
     showToast('Save failed: ' + (err.message || err), 'error');
     console.error('IDB save failed', err);
   }).finally(() => {
@@ -244,16 +261,21 @@ function handleImport(ev) {
 }
 
 async function resetSave() {
-  if (!confirm('This wipes all data including history. Type-confirm in next prompt to be sure.')) return;
+  if (!confirm('This wipes all data including history. Name banks (your custom name lists) will be preserved. Type-confirm in next prompt to be sure.')) return;
   const confirmation = prompt('Type RESET to wipe everything:');
   if (confirmation !== 'RESET') { showToast('Reset cancelled', 'warning'); return; }
+  // Preserve the name-bank library across the reset.
+  let preservedBanks = null;
+  try { preservedBanks = await _idbGet(NAMEBANK_KEY); } catch (e) { /* ignore */ }
+  if (!preservedBanks) preservedBanks = state.nameBanks;
   state = defaultState();
+  state.nameBanks = preservedBanks || deepClone(DEFAULT_NAME_BANKS);
   try { await _idbDel('main'); } catch (e) { /* ignore */ }
   await saveStateNow();
   try { localStorage.removeItem(STATE_KEY); } catch (e) {}
   refreshAll();
   switchTab('settings');
-  showToast('Save wiped', 'success');
+  showToast('Save wiped — name banks preserved', 'success');
 }
 
 /* ===========================================================================
