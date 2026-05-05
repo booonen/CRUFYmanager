@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRUFYmanager</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <div class="logo">
+      <div class="icon">⬡</div>CRUFYmanager
+      <span class="nation-tag" id="nation-header"></span>
+    </div>
+    <div class="actions">
+      <div class="saves-dropdown" id="saves-dropdown">
+        <button class="btn btn-sm" onclick="toggleSavesDropdown(event)">💾 Save <span style="font-size:10px;opacity:0.5">▾</span></button>
+        <div class="saves-dropdown-menu" id="saves-dropdown-menu"></div>
+      </div>
+    </div>
+  </header>
+  <main>
+    <nav id="sidebar">
+      <div class="nav-section">Football</div>
+      <div class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')"><span class="nav-icon">⌂</span> <span>Dashboard</span></div>
+      <div class="nav-item" data-tab="leagues" onclick="switchTab('leagues')"><span class="nav-icon">⊞</span> <span>Leagues</span><span class="badge" id="badge-leagues">0</span></div>
+      <div class="nav-item" data-tab="cups" onclick="switchTab('cups')"><span class="nav-icon">⌖</span> <span>Cups</span><span class="badge" id="badge-cups">0</span></div>
+      <div class="nav-item" data-tab="clubs" onclick="switchTab('clubs')"><span class="nav-icon">⚐</span> <span>Clubs</span><span class="badge" id="badge-clubs">0</span></div>
+      <div class="nav-item" data-tab="players" onclick="switchTab('players')"><span class="nav-icon">☖</span> <span>Players</span><span class="badge" id="badge-players">0</span></div>
+      <div class="nav-item" data-tab="managers" onclick="switchTab('managers')"><span class="nav-icon">▣</span> <span>Managers</span><span class="badge" id="badge-managers">0</span></div>
+
+      <div class="nav-section">Matchday</div>
+      <div class="nav-item" data-tab="fixtures" onclick="switchTab('fixtures')"><span class="nav-icon">◷</span> <span>Fixtures</span></div>
+      <div class="nav-item" data-tab="results" onclick="switchTab('results')"><span class="nav-icon">✓</span> <span>Results</span></div>
+
+      <div class="nav-section">National</div>
+      <div class="nav-item" data-tab="nationalteam" onclick="switchTab('nationalteam')"><span class="nav-icon">★</span> <span>National Team</span></div>
+      <div class="nav-item" data-tab="external" onclick="switchTab('external')"><span class="nav-icon">⟶</span> <span>External Matches</span></div>
+
+      <div class="nav-section">Records</div>
+      <div class="nav-item" data-tab="history" onclick="switchTab('history')"><span class="nav-icon">❒</span> <span>History Book</span></div>
+
+      <div class="nav-section">System</div>
+      <div class="nav-item" data-tab="settings" onclick="switchTab('settings')"><span class="nav-icon">⚙</span> <span>Settings</span></div>
+      <div class="nav-item" data-tab="import-export" onclick="switchTab('import-export')"><span class="nav-icon">⇅</span> <span>Import / Export</span></div>
+      <div class="spacer"></div>
+      <div style="padding:8px 16px;font-size:10px;color:var(--text-muted);font-family:var(--font-mono);opacity:0.6">v0.1.0</div>
+    </nav>
+
+    <div class="content">
+      <!-- DASHBOARD -->
+      <div class="tab-panel active" id="panel-dashboard">
+        <div class="page-header">
+          <div><h1>Dashboard</h1><div class="subtitle">Season at a glance</div></div>
+        </div>
+        <div class="stats-row" id="dashboard-stats"></div>
+        <div id="dashboard-content"></div>
+      </div>
+
+      <!-- LEAGUES -->
+      <div class="tab-panel" id="panel-leagues">
+        <div class="page-header">
+          <div><h1>Leagues</h1><div class="subtitle">Tiered competitions with promotion / relegation</div></div>
+          <div class="flex gap-8">
+            <button class="btn btn-primary" onclick="openLeagueModal()">+ Add League</button>
+          </div>
+        </div>
+        <div id="leagues-list"></div>
+        <div id="league-detail"></div>
+      </div>
+
+      <!-- CUPS -->
+      <div class="tab-panel" id="panel-cups">
+        <div class="page-header">
+          <div><h1>Cups</h1><div class="subtitle">Knockout and group-stage competitions</div></div>
+          <div class="flex gap-8">
+            <button class="btn btn-primary" onclick="openCupModal()">+ Add Cup</button>
+          </div>
+        </div>
+        <div id="cups-list"></div>
+        <div id="cup-detail"></div>
+      </div>
+
+      <!-- CLUBS -->
+      <div class="tab-panel" id="panel-clubs">
+        <div class="page-header">
+          <div><h1>Clubs</h1><div class="subtitle">Stadiums, squads, captains, history</div></div>
+          <div class="flex gap-8">
+            <button class="btn" onclick="openGenerateClubsModal()">⚙ Bulk-create</button>
+            <button class="btn btn-primary" onclick="openClubModal()">+ Add Club</button>
+          </div>
+        </div>
+        <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="clubs-search" placeholder="Search clubs..." oninput="renderClubs()"></div>
+        <div id="clubs-list"></div>
+        <div id="club-detail"></div>
+      </div>
+
+      <!-- PLAYERS -->
+      <div class="tab-panel" id="panel-players">
+        <div class="page-header">
+          <div><h1>Players</h1><div class="subtitle">Squad members across all clubs</div></div>
+          <div class="flex gap-8">
+            <button class="btn btn-primary" onclick="openPlayerModal()">+ Add Player</button>
+          </div>
+        </div>
+        <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="players-search" placeholder="Search players..." oninput="renderPlayers()"></div>
+        <div id="players-list"></div>
+        <div id="player-detail"></div>
+      </div>
+
+      <!-- MANAGERS -->
+      <div class="tab-panel" id="panel-managers">
+        <div class="page-header">
+          <div><h1>Managers</h1><div class="subtitle">Active and unemployed gaffers</div></div>
+          <div class="flex gap-8">
+            <button class="btn btn-primary" onclick="openManagerModal()">+ Add Manager</button>
+          </div>
+        </div>
+        <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="managers-search" placeholder="Search managers..." oninput="renderManagers()"></div>
+        <div id="managers-list"></div>
+        <div id="manager-detail"></div>
+      </div>
+
+      <!-- FIXTURES -->
+      <div class="tab-panel" id="panel-fixtures">
+        <div class="page-header">
+          <div><h1>Fixtures</h1><div class="subtitle">Upcoming matchdays — generate, commit, advance</div></div>
+        </div>
+        <div id="fixtures-content"></div>
+      </div>
+
+      <!-- RESULTS -->
+      <div class="tab-panel" id="panel-results">
+        <div class="page-header">
+          <div><h1>Results</h1><div class="subtitle">Committed match reports</div></div>
+        </div>
+        <div id="results-content"></div>
+      </div>
+
+      <!-- NATIONAL TEAM -->
+      <div class="tab-panel" id="panel-nationalteam">
+        <div class="page-header">
+          <div><h1>National Team</h1><div class="subtitle">Squad selection and call-ups</div></div>
+        </div>
+        <div id="nt-content"></div>
+      </div>
+
+      <!-- EXTERNAL MATCHES -->
+      <div class="tab-panel" id="panel-external">
+        <div class="page-header">
+          <div><h1>External Matches</h1><div class="subtitle">Off-engine fixtures: NT friendlies, qualifiers, continental club ties</div></div>
+          <div class="flex gap-8">
+            <button class="btn btn-primary" onclick="openExternalModal()">+ Add External</button>
+          </div>
+        </div>
+        <div id="external-content"></div>
+      </div>
+
+      <!-- HISTORY BOOK -->
+      <div class="tab-panel" id="panel-history">
+        <div class="page-header">
+          <div><h1>History Book</h1><div class="subtitle">Append-only ledger — all derived views read from here</div></div>
+        </div>
+        <div id="history-content"></div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="tab-panel" id="panel-settings">
+        <div class="page-header">
+          <div><h1>Settings</h1><div class="subtitle">Nation identity and name banks</div></div>
+        </div>
+        <div id="settings-content"></div>
+      </div>
+
+      <!-- IMPORT / EXPORT -->
+      <div class="tab-panel" id="panel-import-export">
+        <div class="page-header">
+          <div><h1>Import / Export</h1><div class="subtitle">Save backups and BBCode output</div></div>
+        </div>
+        <div id="ie-content"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modal-overlay" onmousedown="_modalMouseDownTarget=event.target" onclick="closeModalOnOverlay(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header"><h2 id="modal-title">Modal</h2><button class="close-btn" onclick="closeModal()">✕</button></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<input type="file" id="file-input" accept=".json" style="display:none" onchange="handleImport(event)">
+
+<script src="js/data.js"></script>
+<script src="js/state.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/export.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/views.js"></script>
+<script src="js/views2.js"></script>
+<script src="js/forms.js"></script>
+<script>
+(async () => {
+  await loadState();
+  refreshAll();
+  switchTab(state.ui.lastTab || 'dashboard');
+})();
+</script>
+</body>
+</html>
