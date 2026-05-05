@@ -90,6 +90,11 @@ function defaultState() {
       retirementGK:    { early: 28, normalLow: 36, normalHigh: 41, late: 44 },
       retirementOutfield: { early: 26, normalLow: 33, normalHigh: 38, late: 41 },
     },
+    /* Shared season calendar. All leagues' matchdays are distributed across
+     * `totalDays` so a single "Advance day" tick plays the matches happening
+     * that day across the whole nation. Roll-over happens once when day
+     * exceeds totalDays — irrespective of how many leagues there are. */
+    calendar: { season: 1, day: 1, totalDays: 38 },
     nameBanks: deepClone(DEFAULT_NAME_BANKS),
     clubs: [],
     players: [],
@@ -181,6 +186,29 @@ function migrateState(parsed) {
       if (e.awayXI) { e.awayFormation = e.awayFormation || (e.awayXI.formation || null); delete e.awayXI; }
     }
     if (slimmed) console.log(`Compacted ${slimmed} historic match records on load.`);
+  }
+  // Calendar migration: backfill day numbers on old league schedules and
+  // derive a sensible calendar.day / totalDays.
+  if (Array.isArray(fresh.leagues) && fresh.leagues.length) {
+    let maxMatchdays = 0;
+    let maxPlayedMatchday = 0;
+    for (const lg of fresh.leagues) {
+      if (!lg.schedule || !lg.schedule.length) continue;
+      maxMatchdays = Math.max(maxMatchdays, lg.schedule.length);
+      for (const rd of lg.schedule) {
+        if (rd.day == null) rd.day = rd.matchday;   // legacy: matchday == day
+        const allPlayed = rd.fixtures.every(f => f.played);
+        if (allPlayed) maxPlayedMatchday = Math.max(maxPlayedMatchday, rd.day);
+      }
+    }
+    if (!fresh.calendar) fresh.calendar = { season: fresh.settings?.season || 1, day: 1, totalDays: 38 };
+    fresh.calendar.totalDays = Math.max(fresh.calendar.totalDays || 0, maxMatchdays || 38);
+    if (!fresh.calendar.day || fresh.calendar.day < 1) {
+      fresh.calendar.day = Math.min(maxPlayedMatchday + 1, fresh.calendar.totalDays);
+    }
+    if (!fresh.calendar.season) fresh.calendar.season = fresh.settings?.season || 1;
+  } else if (!fresh.calendar) {
+    fresh.calendar = { season: fresh.settings?.season || 1, day: 1, totalDays: 38 };
   }
   return fresh;
 }

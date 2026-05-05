@@ -261,6 +261,156 @@ function generateLeagueSchedule(leagueId) {
   lg.schedule = firstHalf.concat(secondHalf);
   lg.season = state.settings.season;
   lg.status = 'active';
+
+  // Slot each matchday onto the shared calendar, expanding totalDays if
+  // this league has more matchdays than currently planned for the season.
+  if (!state.calendar) state.calendar = { season: state.settings.season, day: 1, totalDays: lg.schedule.length };
+  if (state.calendar.totalDays < lg.schedule.length) state.calendar.totalDays = lg.schedule.length;
+  assignDaysToSchedule(lg);
+  recomputeCalendarTotalDays();
+}
+
+/* For each round in `lg.schedule`, set `round.day` so the matchdays are
+ * spread evenly across the season's totalDays. Round 1 always lands on
+ * day 1; the final round always lands on day = totalDays. */
+function assignDaysToSchedule(lg) {
+  const n = lg.schedule.length;
+  const D = state.calendar.totalDays;
+  if (n <= 1 || D <= 1) {
+    lg.schedule.forEach((rd, i) => rd.day = i + 1);
+    return;
+  }
+  for (let i = 0; i < n; i++) {
+    lg.schedule[i].day = Math.round(i * (D - 1) / (n - 1)) + 1;
+  }
+}
+
+function recomputeCalendarTotalDays() {
+  let max = 0;
+  for (const lg of state.leagues) {
+    if (lg.schedule && lg.schedule.length) max = Math.max(max, lg.schedule.length);
+  }
+  if (max === 0) max = 38;
+  if (!state.calendar) state.calendar = { season: state.settings.season, day: 1, totalDays: max };
+  // If totalDays grew because a bigger league joined, redistribute the
+  // smaller leagues' days across the new totalDays. Played fixtures keep
+  // their slot — only future matchdays shift.
+  const oldTotal = state.calendar.totalDays;
+  state.calendar.totalDays = max;
+  if (max !== oldTotal) {
+    for (const lg of state.leagues) {
+      if (!lg.schedule || !lg.schedule.length) continue;
+      const allPlayed = lg.schedule.every(rd => rd.fixtures.every(f => f.played));
+      const anyPlayed = lg.schedule.some(rd => rd.fixtures.some(f => f.played));
+      // If nothing played in this league this season, just rebuild day mapping.
+      if (!anyPlayed) assignDaysToSchedule(lg);
+      // Otherwise leave existing day numbers alone so progress isn't disturbed.
+    }
+  }
+}
+
+/* Find the next day (>= calendar.day, <= totalDays) that has at least one
+ * unplayed fixture across any league. Returns null if the season is over. */
+function nextCalendarDay() {
+  if (!state.calendar) return null;
+  const total = state.calendar.totalDays;
+  for (let d = state.calendar.day; d <= total; d++) {
+    if (fixturesOnCalendarDay(d).some(f => !f.fixture.played)) return d;
+  }
+  return null;
+}
+
+/* Flat list of fixtures across all leagues scheduled for `day`. */
+function fixturesOnCalendarDay(day) {
+  const out = [];
+  for (const lg of state.leagues) {
+    if (!lg.schedule) continue;
+    const rd = lg.schedule.find(r => r.day === day);
+    if (!rd) continue;
+    for (const fx of rd.fixtures) out.push({ leagueId: lg.id, matchday: rd.matchday, day: rd.day, fixture: fx });
+  }
+  return out;
+}
+
+/* Generate drafts for every unplayed fixture on `day` across all leagues. */
+function generateCalendarDayDrafts(day) {
+  state.draftMatches = (state.draftMatches || []).filter(d => d.calendarDay !== day);
+  const fixtures = fixturesOnCalendarDay(day).filter(f => !f.fixture.played);
+  const drafts = [];
+  for (const f of fixtures) {
+    const draft = simulateMatch({ homeId: f.fixture.homeId, awayId: f.fixture.awayId, leagueId: f.leagueId, matchday: f.matchday });
+    if (draft) { draft.calendarDay = day; drafts.push(draft); }
+  }
+  state.draftMatches.push(...drafts);
+  saveState();
+  return drafts;
+}
+
+function commitCalendarDay(day) {
+  const drafts = (state.draftMatches || []).filter(d => d.calendarDay === day);
+  for (const d of drafts) commitMatch(d);
+  if (day >= state.calendar.day) state.calendar.day = day + 1;
+  saveState();
+  return drafts.length;
+}
+
+function discardCalendarDay(day) {
+  state.draftMatches = (state.draftMatches || []).filter(d => d.calendarDay !== day);
+  saveState();
+}
+
+function rerollCalendarDay(day) {
+  state.draftMatches = (state.draftMatches || []).filter(d => d.calendarDay !== day);
+  return generateCalendarDayDrafts(day);
+}
+
+/* Generate AND commit through every remaining day of this season, then run
+ * the season rollover. */
+function advanceCalendarToEndOfSeason() {
+  let safety = (state.calendar?.totalDays || 38) * 2;
+  while (--safety > 0) {
+    const day = nextCalendarDay();
+    if (day == null) break;
+    generateCalendarDayDrafts(day);
+    commitCalendarDay(day);
+  }
+  // Cup tidy-up: play out any remaining cup ties this season
+  for (const cp of state.cups) {
+    let cupSafety = 50;
+    while (--cupSafety > 0) {
+      const fx = nextCupFixtures(cp.id);
+      if (!fx.length) break;
+      for (const f of fx) {
+        const draft = simulateMatch({ homeId: f.homeId, awayId: f.awayId, cupId: cp.id, neutral: f.neutral, isKnockout: cp._currentRound !== 'groups', requiresWinner: cp._currentRound !== 'groups' });
+        if (draft) commitMatch(draft);
+      }
+      advanceCup(cp.id);
+    }
+  }
+  if (calendarSeasonComplete()) rollSeasonOver();
+}
+
+function calendarSeasonComplete() {
+  if (!state.calendar) return false;
+  if (state.calendar.day <= state.calendar.totalDays) {
+    // also check no day has unplayed fixtures
+    if (nextCalendarDay() != null) return false;
+  }
+  return true;
+}
+
+/* Run the end-of-season pipeline, then reset the calendar for next season.
+ * No-op (with a warning toast inside endOfSeasonProcessing) if no leagues
+ * have actually completed their schedules. */
+function rollSeasonOver() {
+  const seasonBefore = state.settings.season;
+  endOfSeasonProcessing();
+  if (state.settings.season === seasonBefore) return;   // EoS bailed; don't reset calendar
+  state.calendar = state.calendar || { season: state.settings.season, day: 1, totalDays: 38 };
+  state.calendar.season = state.settings.season;
+  state.calendar.day = 1;
+  recomputeCalendarTotalDays();
+  saveState();
 }
 
 /* Cup bracket generation. Knockout: power-of-2 padded with byes.
@@ -1039,8 +1189,23 @@ function commitMatch(draft) {
 
   // Remove from drafts
   state.draftMatches = (state.draftMatches || []).filter(d => d.id !== draft.id);
+  // Keep calendar.day in sync: roll past any days that are now fully played
+  syncCalendarDay();
   saveState();
   return draft;
+}
+
+/* Walk calendar.day forward through any days that have no unplayed fixtures
+ * left, so the banner reflects what's actually next. */
+function syncCalendarDay() {
+  if (!state.calendar) return;
+  const total = state.calendar.totalDays || 0;
+  while (state.calendar.day <= total) {
+    const day = state.calendar.day;
+    const anyPending = fixturesOnCalendarDay(day).some(f => !f.fixture.played);
+    if (anyPending) break;
+    state.calendar.day++;
+  }
 }
 
 function markCupFixturePlayed(cp, draft) {
@@ -1446,19 +1611,6 @@ function endOfSeasonProcessing() {
     if (state.ntSquadHistory.length > 60) state.ntSquadHistory = state.ntSquadHistory.slice(-60);
   }
 
-  // Reset cups; rebuild league schedules
-  for (const lg of state.leagues) {
-    if (lg.status === 'completed') {
-      generateLeagueSchedule(lg.id);
-    }
-  }
-  for (const cp of state.cups) {
-    cp.status = 'pending';
-    cp.rounds = [];
-    cp.groups = [];
-    cp._currentRound = null;
-  }
-
   // Snapshot player skill history (overall + raw attrs) for non-retired players
   for (const p of state.players) {
     if (p.isRetired) continue;
@@ -1480,8 +1632,22 @@ function endOfSeasonProcessing() {
     if (p.skillHistory.length > 30) p.skillHistory = p.skillHistory.slice(-30);
   }
 
-  // Bump season
+  // Bump season BEFORE rebuilding schedules so the new fixture lists carry
+  // the new season number.
   state.settings.season += 1;
+
+  // Reset cups; rebuild league schedules onto a fresh shared calendar.
+  for (const lg of state.leagues) {
+    if (lg.status === 'completed') {
+      generateLeagueSchedule(lg.id);
+    }
+  }
+  for (const cp of state.cups) {
+    cp.status = 'pending';
+    cp.rounds = [];
+    cp.groups = [];
+    cp._currentRound = null;
+  }
   saveState();
 }
 

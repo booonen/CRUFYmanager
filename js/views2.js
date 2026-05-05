@@ -5,67 +5,107 @@
  * ========================================================================= */
 
 /* ===========================================================================
- * FIXTURES — generation control: per-match, matchday, end-of-season
+ * FIXTURES — shared-calendar view. All leagues' matchdays are positioned on
+ * one timeline; "Day N" plays whatever is scheduled across leagues. Roll-
+ * over fires once when the calendar reaches the end.
  * ========================================================================= */
 function renderFixtures() {
   const root = document.getElementById('fixtures-content');
   if (!root) return;
   if (!state.leagues.length) { root.innerHTML = emptyState({ icon: '◷', title: 'No leagues', body: 'Create a league to start scheduling matches.' }); return; }
 
+  const cal = state.calendar || { season: state.settings.season, day: 1, totalDays: 38 };
+  const today = nextCalendarDay();
+  const seasonComplete = (today == null);
   let html = '';
-  for (const lg of state.leagues) {
-    if (!lg.schedule || !lg.schedule.length) continue;
-    const next = nextMatchdayForLeague(lg.id);
-    if (!next) {
-      html += `<div class="card mb-16"><h3>${esc(lg.name)} — Season complete</h3><p class="text-muted">All matchdays played. Click "Roll season over" below to start the next season.</p></div>`;
-      continue;
+
+  // Calendar banner
+  html += `<div class="card mb-16">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+      <div>
+        <h3 style="margin-bottom:4px">Season ${cal.season} · Day ${cal.day} of ${cal.totalDays}</h3>
+        <div class="text-muted" style="font-size:12px">${seasonComplete ? 'All scheduled matches played — roll the season over to start the next.' : `Next match day: <strong>Day ${today}</strong>`}</div>
+        <div class="text-muted" style="font-size:11px;margin-top:4px">${calendarLeagueSummary()}</div>
+      </div>
+      <div class="flex gap-8 flex-wrap">
+        ${!seasonComplete ? `<button class="btn btn-warn" onclick="if (confirm('Generate AND commit every remaining match this season? This ends the calendar and rolls over.')) { advanceCalendarToEndOfSeason(); refreshAll(); showToast('Season fast-forwarded','success'); }">⏭ End season</button>` : ''}
+        ${seasonComplete ? `<button class="btn btn-primary" onclick="if (confirm('Roll over to next season?')) { rollSeasonOver(); refreshAll(); showToast('New season begun','success'); }">↻ Roll season over</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+
+  // Today's fixtures
+  if (!seasonComplete) {
+    const fixtures = fixturesOnCalendarDay(today);
+    const drafts = (state.draftMatches || []).filter(d => d.calendarDay === today);
+    const unplayed = fixtures.filter(f => !f.fixture.played);
+    html += `<h3 style="font-family:var(--font-display);margin:18px 0 8px">Day ${today} <span class="text-muted" style="font-size:13px;font-weight:400">— ${fixtures.length} match${fixtures.length === 1 ? '' : 'es'}</span></h3>`;
+
+    // Group by league
+    const byLeague = {};
+    for (const f of fixtures) (byLeague[f.leagueId] = byLeague[f.leagueId] || []).push(f);
+
+    for (const [leagueId, ls] of Object.entries(byLeague)) {
+      const lg = getLeague(leagueId);
+      if (!lg) continue;
+      const matchday = ls[0].matchday;
+      html += `<div class="card mb-16">
+        <h3>${esc(lg.name)} <span class="text-muted" style="font-size:13px;font-weight:400">— Matchday ${matchday}</span></h3>`;
+      for (const f of ls) {
+        const home = getClub(f.fixture.homeId);
+        const away = getClub(f.fixture.awayId);
+        if (!home || !away) continue;
+        const draft = drafts.find(d => d.homeId === f.fixture.homeId && d.awayId === f.fixture.awayId);
+        if (draft) {
+          html += `<div class="scoreline scoreline-draft" onclick="viewMatchModal('${draft.id}')" style="cursor:pointer">
+            <div class="home-team">${esc(home.name)}</div>
+            <div class="score">${draft.hScore}–${draft.aScore}<span class="pen-detail">draft · click to review</span></div>
+            <div class="away-team">${esc(away.name)}</div>
+          </div>`;
+        } else if (f.fixture.played) {
+          // Find the committed match in history
+          const m = state.history.find(e => e.type === 'match_committed' && e.matchId === f.fixture.matchId);
+          html += `<div class="scoreline scoreline-committed" onclick="${m ? `viewMatchModal('${m.id}')` : ''}" style="${m ? 'cursor:pointer' : ''}">
+            <div class="home-team">${esc(home.name)}</div>
+            <div class="score">${m ? `${m.hScore}–${m.aScore}` : 'played'}</div>
+            <div class="away-team">${esc(away.name)}</div>
+          </div>`;
+        } else {
+          html += `<div class="scoreline">
+            <div class="home-team">${esc(home.name)}</div>
+            <div class="score" style="cursor:pointer" onclick="generateSingleMatchAndView('${lg.id}', '${f.fixture.matchId}')">vs<br><span class="pen-detail">click to draft</span></div>
+            <div class="away-team">${esc(away.name)}</div>
+          </div>`;
+        }
+      }
+      html += `</div>`;
     }
-    const drafts = (state.draftMatches || []).filter(d => d.leagueId === lg.id && d.matchday === next.matchday);
+
     html += `<div class="gen-bar">
-      <div class="gen-info"><strong>${esc(lg.name)}</strong> — next: Matchday ${next.matchday} (${next.fixtures.length} matches, ${drafts.length ? `<span class="text-warn">${drafts.length} drafts pending</span>` : 'no drafts yet'})</div>
+      <div class="gen-info">${unplayed.length} unplayed · ${drafts.length} drafted</div>
       <div class="gen-actions">
-        ${drafts.length === 0 ? `<button class="btn btn-primary" onclick="generateMatchdayDrafts('${lg.id}'); refreshAll(); showToast('Drafted matchday ${next.matchday}','success')">⚡ Draft matchday</button>` : `
-          <button class="btn btn-warn" onclick="rerollMatchday('${lg.id}', ${next.matchday})">↻ Re-roll all</button>
-          <button class="btn btn-danger" onclick="discardMatchday('${lg.id}', ${next.matchday})">✕ Discard all</button>
-          <button class="btn btn-primary" onclick="commitAllDraftsForMatchday('${lg.id}', ${next.matchday}); refreshAll(); showToast('Matchday committed','success')">✓ Commit matchday</button>
-        `}
-        <button class="btn btn-warn" onclick="if(confirm('Generate AND commit every remaining match this season? This will end the season.')) { generateAndCommitToEndOfSeason('${lg.id}'); refreshAll(); showToast('Season fast-forwarded','success'); }">⏭ End season</button>
+        ${drafts.length === 0 && unplayed.length > 0
+          ? `<button class="btn btn-primary" onclick="generateCalendarDayDrafts(${today}); refreshAll(); showToast('Drafted Day ' + ${today},'success')">⚡ Draft Day ${today}</button>`
+          : drafts.length > 0 ? `
+            <button class="btn btn-warn" onclick="rerollCalendarDay(${today}); refreshAll()">↻ Re-roll</button>
+            <button class="btn btn-danger" onclick="if (confirm('Discard ' + ${drafts.length} + ' draft(s)?')) { discardCalendarDay(${today}); refreshAll(); }">✕ Discard</button>
+            <button class="btn btn-primary" onclick="commitCalendarDay(${today}); refreshAll(); showToast('Day ${today} committed','success')">✓ Commit Day</button>
+          ` : ''
+        }
       </div>
     </div>`;
-
-    html += `<div class="card mb-24"><h3>Matchday ${next.matchday}</h3>`;
-    for (const fx of next.fixtures) {
-      const home = getClub(fx.homeId);
-      const away = getClub(fx.awayId);
-      if (!home || !away) continue;
-      const draft = drafts.find(d => d.homeId === fx.homeId && d.awayId === fx.awayId);
-      if (draft) {
-        html += `<div class="scoreline scoreline-draft" onclick="viewMatchModal('${draft.id}')" style="cursor:pointer">
-          <div class="home-team">${esc(home.name)}</div>
-          <div class="score">${draft.hScore}–${draft.aScore}<span class="pen-detail">draft · click to review</span></div>
-          <div class="away-team">${esc(away.name)}</div>
-        </div>`;
-      } else {
-        html += `<div class="scoreline">
-          <div class="home-team">${esc(home.name)}</div>
-          <div class="score" style="cursor:pointer" onclick="generateSingleMatchAndView('${lg.id}', '${fx.matchId}')">vs<br><span class="pen-detail">click to draft</span></div>
-          <div class="away-team">${esc(away.name)}</div>
-        </div>`;
-      }
-    }
-    html += `</div>`;
   }
 
-  // Cup matchdays
+  // Cups stay outside the calendar — keep their advance-round flow
   for (const cp of state.cups) {
     const fixtures = nextCupFixtures(cp.id);
     if (!fixtures.length) continue;
     const drafts = (state.draftMatches || []).filter(d => d.cupId === cp.id);
-    html += `<div class="gen-bar"><div class="gen-info"><strong>${esc(cp.name)}</strong> — next: ${fixtures.length} cup match(es) · ${drafts.length} drafts</div><div class="gen-actions">
-      <button class="btn btn-primary" onclick="generateCupRoundDrafts('${cp.id}'); refreshAll()">⚡ Draft round</button>
+    html += `<div class="gen-bar mt-16"><div class="gen-info"><strong>${esc(cp.name)}</strong> — ${fixtures.length} cup match(es) ready · ${drafts.length} drafts</div><div class="gen-actions">
+      <button class="btn btn-primary" onclick="generateCupRoundDrafts('${cp.id}'); refreshAll()">⚡ Draft cup round</button>
       ${drafts.length ? `<button class="btn btn-primary" onclick="commitCupDrafts('${cp.id}'); refreshAll()">✓ Commit + advance</button>` : ''}
     </div></div>`;
-    html += `<div class="card mb-16"><h3>${esc(cp.name)} — ${cp._currentRound === 'groups' ? 'Group stage' : (cp.rounds[cp.rounds.length - 1]?.name || 'next round')}</h3>`;
+    html += `<div class="card mb-16"><h3>${esc(cp.name)} <span class="text-muted" style="font-size:12px;font-weight:400">— ${cp._currentRound === 'groups' ? 'Group stage' : (cp.rounds[cp.rounds.length - 1]?.name || 'next round')}</span></h3>`;
     for (const fx of fixtures) {
       const home = getClub(fx.homeId);
       const away = getClub(fx.awayId);
@@ -88,23 +128,25 @@ function renderFixtures() {
     html += `</div>`;
   }
 
-  // End-of-season convenience
-  const allDone = state.leagues.length && state.leagues.every(l => l.schedule && l.schedule.length && l.schedule.every(rd => rd.fixtures.every(f => f.played)));
-  if (allDone) {
-    html += `<div class="card"><h3>Season ${state.settings.season} complete</h3>
-      <p>All league matchdays have been played and committed. Roll the season over to:</p>
-      <ul style="font-size:13px;padding-left:18px;color:var(--text-dim)">
-        <li>Crown champions, apply promotions / relegations</li>
-        <li>Age every player by 1 year, retire eligible players, generate youth intakes</li>
-        <li>Process manager hire/sack cycle for AI clubs</li>
-        <li>Generate the next season's schedules</li>
-      </ul>
-      <button class="btn btn-primary" onclick="if(confirm('Roll the season over now?')) { endOfSeasonProcessing(); showToast('New season begun','success'); refreshAll(); }">↻ Roll season over</button>
+  // End-of-season summary card
+  if (seasonComplete) {
+    html += `<div class="card mt-16"><h3>Season ${cal.season} complete</h3>
+      <p>All scheduled days have been played and committed. Roll the season over to crown champions, age players, run youth intake + manager carousel, and start the next season.</p>
     </div>`;
   }
 
-  if (!html) html = emptyState({ icon: '◷', title: 'No active fixtures', body: 'Generate a league schedule from the Leagues tab first.' });
   root.innerHTML = html;
+}
+
+function calendarLeagueSummary() {
+  const lines = [];
+  for (const lg of state.leagues) {
+    if (!lg.schedule || !lg.schedule.length) continue;
+    const total = lg.schedule.length;
+    const played = lg.schedule.filter(rd => rd.fixtures.every(f => f.played)).length;
+    lines.push(`${esc(lg.name)} ${played}/${total}`);
+  }
+  return lines.join(' · ');
 }
 
 function rerollMatchday(leagueId, matchday) {
@@ -121,14 +163,16 @@ function discardMatchday(leagueId, matchday) {
 function generateSingleMatchAndView(leagueId, matchId) {
   const lg = getLeague(leagueId);
   if (!lg) return;
-  let fx = null, matchday = null;
+  let fx = null, matchday = null, day = null;
   for (const rd of lg.schedule) {
     const f = rd.fixtures.find(x => x.matchId === matchId);
-    if (f) { fx = f; matchday = rd.matchday; break; }
+    if (f) { fx = f; matchday = rd.matchday; day = rd.day; break; }
   }
   if (!fx) return;
   const draft = generateSingleFixtureDraft({ homeId: fx.homeId, awayId: fx.awayId, leagueId, matchday });
   if (!draft) return;
+  if (day != null) draft.calendarDay = day;
+  saveState();
   refreshAll();
   setTimeout(() => viewMatchModal(draft, { draft: true }), 50);
 }
