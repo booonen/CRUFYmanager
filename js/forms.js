@@ -651,8 +651,9 @@ function renderExternalModal() {
       ${formGroup('Competition / round', `<input type="text" id="ex-comp" value="${esc(s.competition)}" placeholder="e.g. World Cup qualifier R3">`)}
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:start">
       ${renderExSideHTML('home')}
+      <div style="display:flex;align-items:center;justify-content:center;height:60px"><button class="btn btn-sm" title="Swap home / away" onclick="exSwapSides()" style="margin-top:36px">⇄</button></div>
       ${renderExSideHTML('away')}
     </div>
 
@@ -751,6 +752,18 @@ function exFlagToggle(field, checked) {
   renderExternalModal();
 }
 
+function exSwapSides() {
+  captureExFormState();
+  const s = _exDraftState;
+  [s.home, s.away] = [s.away, s.home];
+  [s.hScore, s.aScore] = [s.aScore, s.hScore];
+  [s.hPenScore, s.aPenScore] = [s.aPenScore, s.hPenScore];
+  // Re-derive XIs since formation/source might have moved
+  refreshExSideXI('home');
+  refreshExSideXI('away');
+  renderExternalModal();
+}
+
 function captureExFormState() {
   const s = _exDraftState;
   const t = document.getElementById('ex-type'); if (t) s.type = t.value;
@@ -836,7 +849,8 @@ function previewExternalDraft(draft) {
   body += `<div class="commentary-log">`;
   for (const ev of events) {
     const minLabel = ev.minute > 90 ? `90+${ev.minute - 90}'` : `${ev.minute}'`;
-    body += `<div class="commentary-event ce-${ev.type}"><div class="ce-min">${minLabel}</div><div class="ce-icon">${ev.icon || ''}</div><div class="ce-text">${esc(ev.text || '')}</div></div>`;
+    const score = ev.score ? `<span class="ce-running-score">${esc(ev.score)}</span>` : '';
+    body += `<div class="commentary-event ce-${ev.type}"><div class="ce-min">${minLabel}</div><div class="ce-icon">${ev.icon || ''}</div><div class="ce-text">${esc(ev.text || '')}${score}</div></div>`;
   }
   body += `</div></div>`;
 

@@ -307,7 +307,8 @@ function viewMatchModal(matchOrEventId, opts = {}) {
   for (const ev of events) {
     const cls = `ce-${ev.type}`;
     const minLabel = ev.minute > 90 ? `90+${ev.minute - 90}'` : `${ev.minute}'`;
-    body += `<div class="commentary-event ${cls}"><div class="ce-min">${minLabel}</div><div class="ce-icon">${ev.icon || ''}</div><div class="ce-text">${esc(ev.text || '')}</div></div>`;
+    const score = ev.score ? `<span class="ce-running-score">${esc(ev.score)}</span>` : '';
+    body += `<div class="commentary-event ${cls}"><div class="ce-min">${minLabel}</div><div class="ce-icon">${ev.icon || ''}</div><div class="ce-text">${esc(ev.text || '')}${score}</div></div>`;
   }
   body += `</div></div>`;
 
@@ -397,16 +398,21 @@ function reconstructMatchEvents(m) {
   const out = [];
   out.push({ minute: 0, type: 'kickoff', icon: '', text: templ(pick(COMMENTARY.kickoff), { hometeam: homeName, awayteam: awayName, stadium: home?.stadiumName || '?', attendance: '—' }) });
 
-  // Goals
-  for (const sc of (m.scorers || [])) {
-    const scorer = getPlayer(sc.playerId);
+  // Goals — track running score so the commentary line shows it inline
+  const sortedScorers = (m.scorers || []).slice().sort((a, b) => a.minute - b.minute);
+  let runH = 0, runA = 0;
+  for (const sc of sortedScorers) {
+    const scorer = sc.playerId ? getPlayer(sc.playerId) : null;
+    const sName = (scorer && scorer.name) || sc.playerName || '?';
     const assister = sc.assistId ? getPlayer(sc.assistId) : null;
+    const aName = assister?.name || sc.assistName || null;
+    if (sc.side === 'home') runH++; else runA++;
     let text;
-    if (sc.penalty) text = templ(pick(COMMENTARY.penaltyScored), { scorer: scorer?.name || '?' });
-    else if (sc.ownGoal) text = `${scorer?.name || '?'} turns the ball into his own net.`;
-    else if (assister) text = templ(pick(COMMENTARY.goalAssist), { scorer: scorer?.name || '?', assister: assister.name });
-    else text = templ(pick(COMMENTARY.goal), { scorer: scorer?.name || '?' });
-    out.push({ minute: sc.minute, type: sc.penalty ? 'penalty' : 'goal', side: sc.side, icon: '⚽', text });
+    if (sc.penalty) text = templ(pick(COMMENTARY.penaltyScored), { scorer: sName });
+    else if (sc.ownGoal) text = `${sName} turns the ball into his own net.`;
+    else if (aName) text = templ(pick(COMMENTARY.goalAssist), { scorer: sName, assister: aName });
+    else text = templ(pick(COMMENTARY.goal), { scorer: sName });
+    out.push({ minute: sc.minute, type: sc.penalty ? 'penalty' : 'goal', side: sc.side, icon: '⚽', score: `${runH}–${runA}`, text });
   }
   // Cards
   for (const c of (m.cards || [])) {

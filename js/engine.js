@@ -369,9 +369,11 @@ function selectXI(clubId, formationName) {
   const used = new Set();
   const slots = formation.map(f => ({ ...f, playerId: null }));
 
-  const rateForRole = (player, role) => {
+  const groupFor = role => ROLE_TO_GROUP[role];
+
+  const rateForRole = (player, role, allowNoise = true) => {
     const a = player.attrs;
-    const grp = ROLE_TO_GROUP[role];
+    const grp = groupFor(role);
     if (player.position === 'GK' && grp !== 'GK') return -1;
     if (player.position !== 'GK' && grp === 'GK') return -1;
     let r = 0;
@@ -384,12 +386,34 @@ function selectXI(clubId, formationName) {
     r -= fatigue * 0.15;
     // Rotation noise: ±18% so close calls get rotated, but clearly-better
     // players still keep their place
-    r *= 0.82 + Math.random() * 0.36;
+    if (allowNoise) r *= 0.82 + Math.random() * 0.36;
     return r - player.status.suspendedFor * 100;
   };
 
-  // Greedy assignment: for each slot, pick best available not-yet-used
+  // Pin the captain (and vice-captain when the captain is unfit) to their
+  // best-fitting slot before the greedy fill. Captains play every match
+  // they're available for.
+  const pin = (player) => {
+    if (!player || used.has(player.id) || isUnavailable(player) || player.isRetired) return false;
+    let bestSlot = null, bestScore = -Infinity;
+    for (const slot of slots) {
+      if (slot.playerId) continue;
+      const s = rateForRole(player, slot.role, false);
+      if (s > bestScore) { bestScore = s; bestSlot = slot; }
+    }
+    if (!bestSlot || bestScore <= 0) return false;
+    bestSlot.playerId = player.id;
+    used.add(player.id);
+    return true;
+  };
+  const cap = club.captainId ? getPlayer(club.captainId) : null;
+  const vc  = club.viceCaptainId ? getPlayer(club.viceCaptainId) : null;
+  pin(cap);
+  pin(vc);
+
+  // Greedy assignment for remaining slots: pick best available not-yet-used
   for (const slot of slots) {
+    if (slot.playerId) continue;
     let best = null, bestScore = -Infinity;
     for (const p of squad) {
       if (used.has(p.id)) continue;
@@ -508,6 +532,15 @@ function simulateMatch({ homeId, awayId, leagueId = null, cupId = null, matchday
 
   events.push({ minute: 0, type: 'kickoff', text: templ(pick(COMMENTARY.kickoff), { hometeam: homeTeamLabel, awayteam: awayTeamLabel, stadium: home.stadiumName, attendance: pickInt(Math.round(home.stadiumCapacity * 0.55), home.stadiumCapacity).toLocaleString() }) });
 
+  // Pre-plan substitution minutes (3 per side, spread across the match).
+  // Injuries may consume slots earlier; the schedule fills any unused slots.
+  const planSubs = () => {
+    const mins = new Set();
+    while (mins.size < 3) mins.add(pickInt(55, 86));
+    return Array.from(mins).sort((a, b) => a - b);
+  };
+  const subSchedule = { home: planSubs(), away: planSubs() };
+
   // Per-minute event probabilities
   const SHOT_RATE = 0.05 + avgTempo / 1300;     // ~6-8 shots per side
   const FOUL_RATE = 0.04 + (ht.pressing + at.pressing) / 2000; // ~4-8 fouls
@@ -531,9 +564,6 @@ function simulateMatch({ homeId, awayId, leagueId = null, cupId = null, matchday
     // Half-time
     if (min === 46) {
       events.push({ minute: 45, type: 'halftime', text: templ(pick(COMMENTARY.halftime), { hometeam: homeTeamLabel, awayteam: awayTeamLabel, hs: hScore, as: aScore }) });
-      // AI may sub at halftime if losing
-      maybeAISub('home', 46);
-      maybeAISub('away', 46);
     }
 
     // Shot events: each side may take a shot this minute
@@ -549,10 +579,10 @@ function simulateMatch({ homeId, awayId, leagueId = null, cupId = null, matchday
     if (rand() < FOUL_RATE) rollFoul(min);
     // Injuries
     if (rand() < INJURY_RATE) rollInjury(min);
-    // Late-game subs
-    if (min === 60 || min === 75) {
-      maybeAISub('home', min);
-      maybeAISub('away', min);
+    // Scheduled subs — force tactical subs at pre-planned minutes
+    for (const side of ['home', 'away']) {
+      if (subsUsed[side] >= 3) continue;
+      if (subSchedule[side].includes(min)) forceAISub(side, min);
     }
   }
 
@@ -630,7 +660,7 @@ function simulateMatch({ homeId, awayId, leagueId = null, cupId = null, matchday
       if (rand() < clamp(conv, 0.65, 0.92)) {
         if (side === 'home') hScore++; else aScore++;
         scorers.push({ playerId: shooter.id, minute: min, ownGoal: false, penalty: true, side, assistId: null });
-        events.push({ minute: min, type: 'goal', side, icon: '⚽', text: templ(pick(COMMENTARY.penaltyScored), { scorer: shooter.name }) });
+        events.push({ minute: min, type: 'goal', side, icon: '⚽', score: `${hScore}–${aScore}`, text: templ(pick(COMMENTARY.penaltyScored), { scorer: shooter.name }) });
       } else {
         events.push({ minute: min, type: 'pen_missed', side, icon: '✕', text: templ(pick(COMMENTARY.penaltyMissed), { scorer: shooter.name, keeper: oppGK ? oppGK.name : 'the keeper' }) });
       }
@@ -656,7 +686,7 @@ function simulateMatch({ homeId, awayId, leagueId = null, cupId = null, matchday
       const txt = assister
         ? templ(pick(COMMENTARY.goalAssist), { scorer: shooter.name, assister: assister.name })
         : templ(pick(COMMENTARY.goal), { scorer: shooter.name });
-      events.push({ minute: min, type: 'goal', side, icon: '⚽', text: txt });
+      events.push({ minute: min, type: 'goal', side, icon: '⚽', score: `${hScore}–${aScore}`, text: txt });
     } else if (r < goalP + saveP) {
       events.push({ minute: min, type: 'shot_saved', side, icon: '✋', text: templ(pick(COMMENTARY.shotSaved), { keeper: oppGK ? oppGK.name : 'the keeper', shooter: shooter.name }) });
     } else if (r < goalP + saveP + blockP) {
@@ -723,22 +753,40 @@ function simulateMatch({ homeId, awayId, leagueId = null, cupId = null, matchday
     else { onPitch[side].delete(victim.id); /* play one short */ }
   }
 
-  function maybeAISub(side, min) {
+  function forceAISub(side, min) {
     if (subsUsed[side] >= 3) return;
-    if (rand() > 0.55) return;
-    // Sub the lowest-rated outfielder for the best benched alternative at same group
+    // Sub the lowest-rated outfielder (NB: never the captain unless we have to)
     const xi = side === 'home' ? homeXI : awayXI;
     const onF = onPitch[side];
-    const onPlayers = xi.slots.filter(s => onF.has(s.playerId)).map(s => ({ slot: s, player: getPlayer(s.playerId) })).filter(x => x.player && x.player.position !== 'GK');
+    const club = side === 'home' ? home : away;
+    const onPlayers = xi.slots
+      .filter(s => onF.has(s.playerId))
+      .map(s => ({ slot: s, player: getPlayer(s.playerId) }))
+      .filter(x => x.player && x.player.position !== 'GK' && x.player.id !== club.captainId);
     if (!onPlayers.length) return;
-    const tired = onPlayers.sort((a, b) => (a.player.attrs.stamina || a.player.attrs.mental) - (b.player.attrs.stamina || b.player.attrs.mental))[0];
-    if (!tired) return;
-    const targetGroup = ROLE_TO_GROUP[tired.slot.role];
+    // Pick the player whose role is filled best by a bench alternative
     const benchPids = onBench[side];
-    const benchPlayers = benchPids.map(getPlayer).filter(Boolean).filter(p => ROLE_TO_GROUP[p.role] === targetGroup);
-    if (!benchPlayers.length) return;
-    const incoming = benchPlayers.sort((a, b) => (b.attrs.shooting + b.attrs.technique) - (a.attrs.shooting + a.attrs.technique))[0];
-    doSub(side, tired.player.id, incoming.id, min, pick(SUBSTITUTION_REASONS));
+    const benchByGroup = {};
+    for (const pid of benchPids) {
+      const p = getPlayer(pid);
+      if (!p) continue;
+      const grp = ROLE_TO_GROUP[p.role];
+      (benchByGroup[grp] = benchByGroup[grp] || []).push(p);
+    }
+    onPlayers.sort((a, b) => playerOverall(a.player) - playerOverall(b.player));
+    for (const cand of onPlayers) {
+      const targetGroup = ROLE_TO_GROUP[cand.slot.role];
+      const benchPlayers = benchByGroup[targetGroup];
+      if (!benchPlayers || !benchPlayers.length) continue;
+      benchPlayers.sort((a, b) => playerOverall(b) - playerOverall(a));
+      doSub(side, cand.player.id, benchPlayers[0].id, min, pick(SUBSTITUTION_REASONS));
+      return;
+    }
+    // Fallback: any bench player for any outfielder
+    if (onPlayers.length && benchPids.length) {
+      const incoming = benchPids.map(getPlayer).filter(Boolean)[0];
+      if (incoming) doSub(side, onPlayers[0].player.id, incoming.id, min, pick(SUBSTITUTION_REASONS));
+    }
   }
 
   function pickSubFor(victim, side) {
@@ -1235,23 +1283,32 @@ function endOfSeasonProcessing() {
     p.status.suspendedFor = 0;
     p.status.fatigue = 0;
     if (p.status.injuredUntil > 0) p.status.injuredUntil = Math.max(0, p.status.injuredUntil - 38);
-    // Slight ageing curve: peak 27-29, decline after 30
-    const dec = p.position === 'GK' ? Math.max(0, p.age - 36) : Math.max(0, p.age - 30);
+    // Decline phase: peak ~27-29, real drop-off from 30 (35 for GKs)
+    const dec = p.position === 'GK' ? Math.max(0, p.age - 35) : Math.max(0, p.age - 29);
     if (dec > 0) {
-      const drop = pickInt(0, 2);
+      const drop = pickInt(1, 3) + (dec > 4 ? 1 : 0);
       for (const k of Object.keys(p.attrs)) {
         if (k === 'goalkeeping' && p.position !== 'GK') continue;
         if (k === 'mental') continue;
         p.attrs[k] = clamp(p.attrs[k] - drop, 1, 99);
       }
-    } else if (p.age < 24) {
-      // Growth toward potential
-      const headroom = p.potential - Math.max(p.attrs.pace, p.attrs.shooting, p.attrs.passing, p.attrs.defending, p.attrs.goalkeeping, p.attrs.technique);
+    } else if (p.age <= 26) {
+      // Growth phase. Steeper for younger players with lots of headroom.
+      // Use the *least-grown primary* as the headroom signal so a maxed-out
+      // primary doesn't stall growth on the others.
+      const primaryKeys = Object.keys(p.attrs).filter(k => isPrimaryAttr(p.position, k));
+      const primaryMin = Math.min(...primaryKeys.map(k => p.attrs[k]));
+      const headroom = Math.max(0, p.potential - primaryMin);
       if (headroom > 0) {
-        const grow = pickInt(0, 2);
+        let grow;
+        if (p.age <= 22) grow = pickInt(2, 5) + Math.floor(headroom / 14);
+        else             grow = pickInt(0, 3);
+        grow = clamp(grow, 0, 8);
         for (const k of Object.keys(p.attrs)) {
           if (k === 'goalkeeping' && p.position !== 'GK') continue;
-          p.attrs[k] = clamp(p.attrs[k] + grow, 1, p.potential);
+          const isPrimary = isPrimaryAttr(p.position, k);
+          const inc = isPrimary ? grow : Math.max(0, Math.floor(grow / 2));
+          p.attrs[k] = clamp(p.attrs[k] + inc, 1, p.potential);
         }
       }
     }
@@ -1269,9 +1326,35 @@ function endOfSeasonProcessing() {
     if (retire) retirePlayer(p);
   }
 
-  // Youth intake
+  // Squad trim BEFORE youth intake. Most clubs target 22-24 senior players;
+  // youth intake will then top them up to ~26-28. Released players are
+  // immediately retired (they're the weakest end of the squad).
+  const TARGET_SQUAD = 23;
   for (const club of state.clubs) {
-    const intake = pickInt(2, 5);
+    let squad = playersByClub(club.id).filter(p => !p.isRetired);
+    if (squad.length <= TARGET_SQUAD) continue;
+    // Sort by overall ascending, captains/vice protected, then drop weakest.
+    const protectedIds = new Set([club.captainId, club.viceCaptainId].filter(Boolean));
+    squad.sort((a, b) => {
+      const ap = protectedIds.has(a.id) ? 1 : 0;
+      const bp = protectedIds.has(b.id) ? 1 : 0;
+      if (ap !== bp) return bp - ap;       // protected last
+      return playerOverall(a) - playerOverall(b);
+    });
+    const releasedIds = [];
+    while (squad.length > TARGET_SQUAD) {
+      const p = squad.shift();
+      if (!p) break;
+      releasedIds.push(p.id);
+      retirePlayer(p);
+    }
+  }
+
+  // Youth intake — slightly smaller default so squads settle ~25-27 after.
+  for (const club of state.clubs) {
+    const cur = playersByClub(club.id).filter(p => !p.isRetired).length;
+    const targetIntake = Math.max(2, TARGET_SQUAD + pickInt(2, 4) - cur);
+    const intake = clamp(targetIntake, 1, 5);
     const newIds = [];
     for (let i = 0; i < intake; i++) {
       const np = generatePlayer({
@@ -1318,6 +1401,51 @@ function endOfSeasonProcessing() {
   // AI transfer window
   runAITransferWindow();
 
+  // Manager pool ageing: unemployed managers tick up their idle counter and
+  // eventually retire from the profession. High-reputation ones stick around.
+  for (const mgr of state.managers) {
+    if (mgr.isUnemployed) {
+      mgr.seasonsUnemployed = (mgr.seasonsUnemployed || 0) + 1;
+    } else {
+      mgr.seasonsUnemployed = 0;
+      mgr.seasonsAtClub = (mgr.seasonsAtClub || 0) + 1;
+    }
+  }
+  const beforeMgrs = state.managers.length;
+  state.managers = state.managers.filter(m => {
+    if (!m.isUnemployed) return true;
+    const idle = m.seasonsUnemployed || 0;
+    if (idle >= 4 && (m.attrs?.reputation || 50) < 70) return false;
+    if (idle >= 6) return false; // even big-rep names eventually drop off
+    return true;
+  });
+  const droppedMgrs = beforeMgrs - state.managers.length;
+  if (droppedMgrs) console.log(`Phased ${droppedMgrs} long-unemployed manager(s) out of the pool.`);
+
+  // Club squad snapshots — used by the historic-squads view.
+  for (const club of state.clubs) {
+    club.squadHistory = club.squadHistory || [];
+    const squadIds = playersByClub(club.id).filter(p => !p.isRetired).map(p => p.id);
+    club.squadHistory.push({
+      season: state.settings.season,
+      managerId: club.managerId,
+      captainId: club.captainId,
+      viceCaptainId: club.viceCaptainId,
+      formation: club.formation,
+      playerIds: squadIds,
+    });
+    if (club.squadHistory.length > 60) club.squadHistory = club.squadHistory.slice(-60);
+  }
+  // NT squad snapshot
+  if (state.settings.ntSquad && state.settings.ntSquad.length) {
+    state.ntSquadHistory = state.ntSquadHistory || [];
+    state.ntSquadHistory.push({
+      season: state.settings.season,
+      playerIds: state.settings.ntSquad.slice(),
+    });
+    if (state.ntSquadHistory.length > 60) state.ntSquadHistory = state.ntSquadHistory.slice(-60);
+  }
+
   // Reset cups; rebuild league schedules
   for (const lg of state.leagues) {
     if (lg.status === 'completed') {
@@ -1361,6 +1489,14 @@ function topScorersForLeague(leagueId) {
   return topScorers(leagueId, state.settings.season, 1);
 }
 
+function isPrimaryAttr(position, attr) {
+  if (position === 'GK') return attr === 'goalkeeping' || attr === 'mental';
+  if (position === 'DF') return ['defending', 'strength', 'pace', 'mental'].includes(attr);
+  if (position === 'MF') return ['passing', 'technique', 'mental', 'pace'].includes(attr);
+  if (position === 'FW') return ['shooting', 'pace', 'technique', 'mental'].includes(attr);
+  return false;
+}
+
 function nextFreeShirtNumber(clubId) {
   const used = new Set(playersByClub(clubId).map(p => p.shirtNumber).filter(Boolean));
   for (let n = 1; n < 100; n++) if (!used.has(n)) return n;
@@ -1387,9 +1523,25 @@ function retirePlayer(p) {
       formerPlayerId: p.id
     });
     mgr.firstName = p.firstName; mgr.lastName = p.lastName;
+    // Track every club this player turned out for. Used by AI hiring to bias
+    // ex-players toward returning to clubs they played for.
+    mgr.formerClubs = playerClubsPlayedFor(p.id);
     historyAppend('player_to_manager', { playerId: p.id, managerId: mgr.id });
   }
   historyAppend('player_retired', { playerId: p.id, age: p.age, willBeManager, clubId: oldClubId });
+}
+
+function playerClubsPlayedFor(playerId) {
+  const seen = new Set();
+  for (const e of state.history) {
+    if (e.type !== 'match_committed' || e.struck) continue;
+    const apps = (e.appearances || []).filter(a => a.playerId === playerId);
+    for (const ap of apps) {
+      const cid = ap.side === 'home' ? e.homeId : e.awayId;
+      if (cid) seen.add(cid);
+    }
+  }
+  return Array.from(seen);
 }
 
 function sackManager(clubId, reason) {
@@ -1522,6 +1674,7 @@ function scriptedMatch({
   }
   goalEvents.sort((a, b) => a.minute - b.minute);
 
+  let runH = 0, runA = 0;
   for (const g of goalEvents) {
     const xi = g.side === 'home' ? hPlayers : aPlayers;
     const weights = xi.map(p => Math.max((p.attrs?.shooting || 50) + (p.position === 'FW' ? 35 : p.position === 'MF' ? 12 : 0), 1));
@@ -1536,17 +1689,11 @@ function scriptedMatch({
         assister = weightedPick(others, aw);
       }
     }
-    let owningSide = g.side;
-    let credited = scorer;
-    if (isOG) {
-      // Own goal: credited goal goes to opposing side, named scorer is on g.side
-      owningSide = g.side === 'home' ? 'away' : 'home';
-      // (In our schema we record `side` as the side that scored, plus ownGoal flag with the scorer's actual team)
-    }
+    if (g.side === 'home') runH++; else runA++;
     scorers.push({
       playerId: scorer.id || null,
       playerName: scorer.name,
-      side: g.side,                  // side credited with the goal
+      side: g.side,
       ownGoalSide: isOG ? (g.side === 'home' ? 'away' : 'home') : null,
       minute: g.minute,
       ownGoal: isOG,
@@ -1559,7 +1706,7 @@ function scriptedMatch({
     else if (isOG) text = `${scorer.name} turns the ball into his own net.`;
     else if (assister) text = templ(pick(COMMENTARY.goalAssist), { scorer: scorer.name, assister: assister.name });
     else text = templ(pick(COMMENTARY.goal), { scorer: scorer.name });
-    events.push({ minute: g.minute, type: isPenalty ? 'penalty' : 'goal', side: g.side, icon: '⚽', text });
+    events.push({ minute: g.minute, type: isPenalty ? 'penalty' : 'goal', side: g.side, icon: '⚽', score: `${runH}–${runA}`, text });
   }
 
   // Cards: 2-5 yellows + occasional red
@@ -1756,17 +1903,22 @@ function hireManagerForClub(clubId) {
   // Pool: unemployed managers, weighted by reputation
   let pool = state.managers.filter(m => m.isUnemployed);
   if (!pool.length) {
-    // Generate one
-    const m = generateManager({ nationality: club.nameBankPref });
+    // Generate one — match the club's nationality flavour
+    const m = generateManager({ nameBank: club.nameBankPref, nationality: club.nationality || state.settings.nation?.name });
     pool = [m];
   }
-  // Score by tactical + reputation - random
-  const scored = pool.map(m => ({ m, s: m.attrs.tactical * 0.4 + m.attrs.reputation * 0.7 + randNorm(0, 8) }));
+  // Score by tactical + reputation, plus a hefty bonus if they're an ex-
+  // player who turned out for this club, plus a small randomiser.
+  const scored = pool.map(m => {
+    const exBonus = (m.formerClubs && m.formerClubs.includes(clubId)) ? 22 : 0;
+    return { m, s: m.attrs.tactical * 0.4 + m.attrs.reputation * 0.7 + exBonus + randNorm(0, 8) };
+  });
   scored.sort((a, b) => b.s - a.s);
   const hired = scored[0].m;
   hired.clubId = clubId;
   hired.isUnemployed = false;
   hired.seasonsAtClub = 0;
+  hired.seasonsUnemployed = 0;
   club.managerId = hired.id;
   historyAppend('manager_hired', { managerId: hired.id, clubId });
 }

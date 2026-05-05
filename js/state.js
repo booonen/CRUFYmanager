@@ -354,7 +354,7 @@ function historyForClub(clubId) {
 function historyForPlayer(playerId) {
   return state.history.filter(e => {
     if (e.struck) return false;
-    if (e.type === 'match_committed' && (
+    if ((e.type === 'match_committed' || e.type === 'external_match') && (
         (e.appearances || []).some(a => a.playerId === playerId) ||
         (e.scorers || []).some(s => s.playerId === playerId))) return true;
     if (e.type === 'player_retired' && e.playerId === playerId) return true;

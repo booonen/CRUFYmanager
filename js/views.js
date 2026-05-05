@@ -403,6 +403,7 @@ function renderClubDetailHTML(id) {
         ${!squad.length ? '<div class="empty-state"><p>No players in this squad. Use the bulk-create option in Clubs view to populate.</p></div>' : ''}
       </div>
       <div class="card mb-16"><h3>Season-by-season</h3>${renderClubSeasonHistoryHTML(id)}</div>
+      <div class="card mb-16"><h3>Historic squads</h3>${renderClubSquadHistoryHTML(c)}</div>
       <div class="card"><h3>Head-to-head <span class="text-muted" style="font-size:12px;font-weight:400">all-time, sorted by wins</span></h3>${renderClubHeadToHeadHTML(id)}</div>
     </div>
     <div>
@@ -429,6 +430,32 @@ function renderClubDetailHTML(id) {
       </div>
     </div>
   </div>`;
+  return html;
+}
+
+function renderClubSquadHistoryHTML(club) {
+  const history = (club.squadHistory || []).slice().sort((a, b) => b.season - a.season);
+  if (!history.length) return '<p class="text-muted" style="font-size:12px">No snapshots yet — squads are saved at the end of each season.</p>';
+  let html = '';
+  for (const snap of history) {
+    const players = (snap.playerIds || []).map(getPlayer).filter(Boolean);
+    const cap = snap.captainId ? getPlayer(snap.captainId) : null;
+    const mgr = snap.managerId ? getManager(snap.managerId) : null;
+    html += `<details style="margin-bottom:6px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px">
+      <summary style="cursor:pointer;font-weight:400;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline">
+        <span><strong>Season ${snap.season}</strong> · ${players.length} players · ${esc(snap.formation || '?')}</span>
+        <span class="text-muted" style="font-size:11px">${cap ? 'C: ' + esc(cap.name) : ''}${mgr ? ` · Mgr: ${esc(mgr.firstName + ' ' + mgr.lastName)}` : ''}</span>
+      </summary>
+      <div style="margin-top:8px"><table class="data-table" style="font-size:12px"><thead><tr><th>Pos</th><th>Player</th><th class="num-c">Ovr at S${snap.season}</th><th class="num-c">Age</th></tr></thead><tbody>
+      ${players.sort((a,b) => playerOverall(b) - playerOverall(a)).map(p => {
+        const histAtSeason = (p.skillHistory || []).find(h => h.season === snap.season);
+        const ovr = histAtSeason ? histAtSeason.overall : playerOverall(p);
+        const age = histAtSeason ? histAtSeason.age : p.age;
+        return `<tr><td>${positionBadge(p.position)}</td><td>${playerLink(p.id)}${p.id === snap.captainId ? ' <span class="chip chip-accent" style="font-size:10px">C</span>' : ''}</td><td class="num-c">${ovrPill(ovr)}</td><td class="num-c">${age}</td></tr>`;
+      }).join('')}
+      </tbody></table></div>
+    </details>`;
+  }
   return html;
 }
 
@@ -493,14 +520,22 @@ function renderPlayers() {
     return;
   }
   const q = (document.getElementById('players-search')?.value || '').toLowerCase().trim();
-  let players = state.players.filter(p => !p.isRetired);
+  state._playersFilter = state._playersFilter || 'active';
+  let players;
+  if (state._playersFilter === 'active') players = state.players.filter(p => !p.isRetired);
+  else if (state._playersFilter === 'retired') players = state.players.filter(p => p.isRetired);
+  else players = state.players.slice();
   if (q) players = players.filter(p => p.name.toLowerCase().includes(q) || clubName(p.clubId).toLowerCase().includes(q));
+  // Filter chip row
+  const filterChips = `<div class="flex gap-8 mb-16" style="flex-wrap:wrap">
+    ${['active','retired','all'].map(v => `<button class="btn btn-sm ${state._playersFilter === v ? 'btn-primary' : ''}" onclick="setPlayersFilter('${v}')">${v}${v === 'retired' ? ` (${state.players.filter(p => p.isRetired).length})` : ''}</button>`).join('')}
+  </div>`;
   if (!players.length) {
-    list.innerHTML = emptyState({ icon: '☖', title: state.players.length ? 'No matches' : 'No players', body: state.players.length ? 'Adjust the search.' : 'Players are usually created via club bulk-create.' });
+    list.innerHTML = filterChips + emptyState({ icon: '☖', title: state.players.length ? 'No matches' : 'No players', body: state.players.length ? 'Adjust the search or filter.' : 'Players are usually created via club bulk-create.' });
     return;
   }
   players.sort((a, b) => playerOverall(b) - playerOverall(a));
-  list.innerHTML = `<table class="data-table"><thead><tr><th>#</th><th>Pos</th><th>Player</th><th>Club</th><th class="num-c">Age</th><th class="num-c">Ovr</th><th>Nat.</th><th class="num-c">Apps</th><th class="num-c">G</th><th class="num-c">A</th><th>Status</th><th class="actions-cell"></th></tr></thead><tbody>` +
+  list.innerHTML = filterChips + `<table class="data-table"><thead><tr><th>#</th><th>Pos</th><th>Player</th><th>Club</th><th class="num-c">Age</th><th class="num-c">Ovr</th><th>Nat.</th><th class="num-c">Apps</th><th class="num-c">G</th><th class="num-c">A</th><th>Status</th><th class="actions-cell"></th></tr></thead><tbody>` +
     players.slice(0, 500).map(p => `<tr>
       <td class="num">${p.shirtNumber ?? '-'}</td>
       <td>${positionBadge(p.position)}</td>
@@ -550,7 +585,6 @@ function renderPlayerDetailHTML(id) {
       </div>
       <div class="card mb-16"><h3>Skill over time</h3>${renderPlayerSkillChartHTML(p)}</div>
       <div class="card mb-16"><h3>Career by season</h3>${renderPlayerCareerHTML(id, career)}</div>
-      <div class="card mb-16"><h3>Match log <span class="text-muted" style="font-size:12px;font-weight:400">most recent first</span></h3>${renderPlayerMatchLogHTML(id)}</div>
       <div class="card mb-16"><h3>Player history <span class="text-muted" style="font-size:12px;font-weight:400">all events touching this player</span></h3>${renderPlayerLedgerHTML(id)}</div>
       <div class="card"><h3>Transfers</h3>${renderPlayerTransfersHTML(id)}</div>
     </div>
@@ -642,30 +676,63 @@ function renderPlayerMatchLogHTML(playerId) {
 }
 
 function renderPlayerLedgerHTML(playerId) {
-  const events = historyForPlayer(playerId).slice().sort((a, b) => b.ts - a.ts);
-  if (!events.length) return '<p class="text-muted" style="font-size:12px">No events recorded yet.</p>';
-  let html = '<div class="news-list">';
-  for (const e of events.slice(0, 200)) {
+  const allEvents = historyForPlayer(playerId).slice().sort((a, b) => b.ts - a.ts);
+  if (!allEvents.length) return '<p class="text-muted" style="font-size:12px">No events recorded yet.</p>';
+
+  // Filter UI state lives on a per-player key in window
+  window._playerLedgerFilter = window._playerLedgerFilter || {};
+  const f = window._playerLedgerFilter[playerId] = window._playerLedgerFilter[playerId] || { type: 'all', season: 'all' };
+  const seasons = Array.from(new Set(allEvents.map(e => e.season))).sort((a, b) => b - a);
+  const types = ['all', 'matches', 'transfers', 'injuries/suspensions', 'milestones'];
+
+  // Filter
+  const matchTypes = new Set(['match_committed', 'external_match']);
+  let events = allEvents.filter(e => {
+    if (f.season !== 'all' && String(e.season) !== f.season) return false;
+    if (f.type === 'all') return true;
+    if (f.type === 'matches') return matchTypes.has(e.type);
+    if (f.type === 'transfers') return e.type === 'player_signed';
+    if (f.type === 'injuries/suspensions') return e.type === 'player_injured' || e.type === 'player_suspended';
+    if (f.type === 'milestones') return ['player_retired','player_to_manager','nt_callup','season_ended'].includes(e.type);
+    return true;
+  });
+
+  let html = `<div class="form-row" style="margin-bottom:10px">
+    ${formGroup('Filter', `<select onchange="setPlayerLedgerFilter('${playerId}','type',this.value)">${types.map(t => `<option value="${esc(t)}" ${t === f.type ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`)}
+    ${formGroup('Season', `<select onchange="setPlayerLedgerFilter('${playerId}','season',this.value)"><option value="all" ${f.season === 'all' ? 'selected' : ''}>all</option>${seasons.map(s => `<option value="${s}" ${String(s) === f.season ? 'selected' : ''}>S${s}</option>`).join('')}</select>`)}
+  </div>`;
+  html += `<p class="text-muted" style="font-size:11px;margin-bottom:6px">${events.length} event${events.length === 1 ? '' : 's'}</p>`;
+  html += '<div class="news-list">';
+  for (const e of events.slice(0, 250)) {
     let txt = '';
     let cls = '';
     switch (e.type) {
       case 'match_committed': {
         const home = clubName(e.homeId), away = clubName(e.awayId);
-        const apps = (e.appearances || []).filter(a => a.playerId === playerId);
-        const ourSide = apps[0]?.side;
         const ourGoals = (e.scorers || []).filter(s => s.playerId === playerId && !s.ownGoal).length;
         const ourAssists = (e.scorers || []).filter(s => s.assistId === playerId).length;
-        const stat = [];
-        if (ourGoals) stat.push(`${ourGoals} goal${ourGoals === 1 ? '' : 's'}`);
-        if (ourAssists) stat.push(`${ourAssists} assist${ourAssists === 1 ? '' : 's'}`);
         const yellow = (e.cards || []).filter(c => c.playerId === playerId && c.type === 'yellow').length;
         const red = (e.cards || []).filter(c => c.playerId === playerId && c.type === 'red').length;
+        const stat = [];
+        if (ourGoals) stat.push(`${ourGoals}G`);
+        if (ourAssists) stat.push(`${ourAssists}A`);
         if (yellow) stat.push(`${yellow}Y`);
         if (red) stat.push(`${red}R`);
         const meta = e.leagueId ? `${getLeague(e.leagueId)?.name || '?'} MD${e.matchday}` : (e.cupId ? getCup(e.cupId)?.name || '?' : '');
         txt = `<a class="clickable" onclick="viewMatchModal('${e.id}')">${esc(home)} ${e.hScore}–${e.aScore} ${esc(away)}</a> <span class="text-muted">${esc(meta)}</span>${stat.length ? ` <span class="text-accent">— ${stat.join(', ')}</span>` : ''}`;
         if (ourGoals) cls = 'ni-major';
         if (red) cls = 'ni-danger';
+        break;
+      }
+      case 'external_match': {
+        const ourGoals = (e.scorers || []).filter(s => s.playerId === playerId && !s.ownGoal).length;
+        const ourAssists = (e.scorers || []).filter(s => s.assistId === playerId).length;
+        const stat = [];
+        if (ourGoals) stat.push(`${ourGoals}G`);
+        if (ourAssists) stat.push(`${ourAssists}A`);
+        const meta = `${e.type || 'External'}${e.competition ? ' · ' + e.competition : ''}`;
+        txt = `<a class="clickable" onclick="viewMatchModal('${e.matchId}')">${esc(e.homeName || '?')} ${e.hScore}–${e.aScore} ${esc(e.awayName || '?')}</a> <span class="text-muted">${esc(meta)}</span>${stat.length ? ` <span class="text-accent">— ${stat.join(', ')}</span>` : ''}`;
+        if (ourGoals) cls = 'ni-major';
         break;
       }
       case 'player_signed': {
@@ -691,9 +758,18 @@ function renderPlayerLedgerHTML(playerId) {
     html += `<div class="news-item ${cls}"><div class="ni-icon">▸</div><div class="ni-text">${txt}</div><div class="ni-time">S${e.season}</div></div>`;
   }
   html += '</div>';
-  if (events.length > 200) html += `<p class="text-muted" style="margin-top:6px;font-size:11px">Showing 200 of ${events.length} events.</p>`;
+  if (events.length > 250) html += `<p class="text-muted" style="margin-top:6px;font-size:11px">Showing 250 of ${events.length} events.</p>`;
   return html;
 }
+
+function setPlayerLedgerFilter(playerId, key, value) {
+  window._playerLedgerFilter = window._playerLedgerFilter || {};
+  window._playerLedgerFilter[playerId] = window._playerLedgerFilter[playerId] || { type: 'all', season: 'all' };
+  window._playerLedgerFilter[playerId][key] = value;
+  renderPlayers();
+}
+
+function renderPlayerMatchLogHTML() { return ''; } // legacy placeholder — match log was merged into player history
 
 function renderPlayerTransfersHTML(playerId) {
   const transfers = state.history.filter(e => e.type === 'player_signed' && !e.struck && e.playerId === playerId).sort((a, b) => b.ts - a.ts);
@@ -705,6 +781,11 @@ function renderPlayerTransfersHTML(playerId) {
   }
   html += `</tbody></table>`;
   return html;
+}
+
+function setPlayersFilter(v) {
+  state._playersFilter = v;
+  renderPlayers();
 }
 
 function deletePlayer(id) {
@@ -762,17 +843,41 @@ function renderManagerDetailHTML(id) {
   </div>`;
   html += `<div class="two-col">
     <div>
-      <div class="card"><h3>Attributes</h3>
+      <div class="card mb-16"><h3>Attributes</h3>
         ${attrBar('Tactical', m.attrs.tactical)}
         ${attrBar('Man-management', m.attrs.manManagement)}
         ${attrBar('Youth development', m.attrs.youthDev)}
         ${attrBar('Reputation', m.attrs.reputation)}
       </div>
+      ${formerPlayer ? `<div class="card"><h3>Playing career <span class="text-muted" style="font-size:12px;font-weight:400">as ${esc(formerPlayer.name)}</span></h3>${renderManagerPlayerCareerHTML(formerPlayer)}</div>` : ''}
     </div>
     <div>
-      <div class="card"><h3>History</h3>${renderManagerHistoryHTML(id)}</div>
+      <div class="card mb-16"><h3>Managerial history</h3>${renderManagerHistoryHTML(id)}</div>
+      ${m.formerClubs && m.formerClubs.length ? `<div class="card"><h3>Clubs played for</h3><div class="flex gap-8" style="flex-wrap:wrap">${m.formerClubs.map(cid => clubLink(cid)).join(' · ')}</div></div>` : ''}
     </div>
   </div>`;
+  return html;
+}
+
+function renderManagerPlayerCareerHTML(player) {
+  const career = playerCareerStats(player.id);
+  const seasons = Object.entries(career.bySeason || {}).sort((a, b) => Number(b[0]) - Number(a[0]));
+  let html = `<div class="kv-row"><div class="kv-l">Position</div><div class="kv-v">${player.position} (${esc(player.role)})</div></div>`;
+  html += `<div class="kv-row"><div class="kv-l">Career apps</div><div class="kv-v"><strong>${career.apps}</strong></div></div>`;
+  html += `<div class="kv-row"><div class="kv-l">Career goals</div><div class="kv-v"><strong>${career.goals}</strong></div></div>`;
+  html += `<div class="kv-row"><div class="kv-l">Career assists</div><div class="kv-v"><strong>${career.assists}</strong></div></div>`;
+  if (player.skillHistory && player.skillHistory.length) {
+    const peak = player.skillHistory.reduce((m, h) => h.overall > m ? h.overall : m, 0);
+    html += `<div class="kv-row"><div class="kv-l">Peak rating</div><div class="kv-v"><strong>${peak}</strong></div></div>`;
+  }
+  if (seasons.length) {
+    html += `<h4>By season</h4><table class="data-table"><thead><tr><th class="num-c">S</th><th>Club</th><th class="num-c">Apps</th><th class="num-c">G</th><th class="num-c">A</th></tr></thead><tbody>`;
+    for (const [season, s] of seasons.slice(0, 25)) {
+      html += `<tr><td class="num-c">${season}</td><td>${clubLink(s.clubId)}</td><td class="num-c">${s.apps}</td><td class="num-c">${s.goals}</td><td class="num-c">${s.assists}</td></tr>`;
+    }
+    html += `</tbody></table>`;
+  }
+  html += `<div style="margin-top:8px"><button class="btn btn-sm" onclick="openPlayerDetail('${player.id}')">View full player profile →</button></div>`;
   return html;
 }
 

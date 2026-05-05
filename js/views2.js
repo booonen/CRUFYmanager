@@ -241,14 +241,15 @@ function renderNationalTeam() {
       </div>
     </div>
     <div>
-      <div class="card"><h3>Current squad</h3>
+      <div class="card mb-16"><h3>Current squad</h3>
         ${!currentSquad.length ? '<p class="text-muted" style="font-size:12px">Empty.</p>' : ''}
         ${['GK','DF','MF','FW'].map(grp => {
           const grpPlayers = currentSquad.filter(p => p.position === grp);
           if (!grpPlayers.length) return '';
-          return `<h4>${grp} (${grpPlayers.length})</h4>` + grpPlayers.map(p => `<div class="squad-row" style="grid-template-columns: 60px 1fr 60px auto"><div class="sr-pos">${positionBadge(p.position)}</div><div class="sr-name">${esc(p.name)}</div><div class="sr-age">${p.age}</div><button class="btn btn-sm btn-danger" onclick="toggleNTSquad('${p.id}')">✗</button></div>`).join('');
+          return `<h4>${grp} (${grpPlayers.length})</h4>` + grpPlayers.map(p => `<div class="squad-row" style="grid-template-columns: 60px 1fr 50px 60px auto"><div class="sr-pos">${positionBadge(p.position)}</div><div class="sr-name">${esc(p.name)}</div><div>${ovrPill(playerOverall(p))}</div><div class="sr-age">${p.age}</div><button class="btn btn-sm btn-danger" onclick="toggleNTSquad('${p.id}')">✗</button></div>`).join('');
         }).join('')}
       </div>
+      <div class="card"><h3>Historic squads</h3>${renderNTSquadHistoryHTML()}</div>
     </div>
   </div>`;
   root.innerHTML = html;
@@ -256,6 +257,32 @@ function renderNationalTeam() {
 
 function approxRating(p) {
   return playerOverall(p);
+}
+
+function renderNTSquadHistoryHTML() {
+  const history = (state.ntSquadHistory || []).slice().sort((a, b) => b.season - a.season);
+  if (!history.length) return '<p class="text-muted" style="font-size:12px">No snapshots yet — your NT squad is saved at the end of each season.</p>';
+  let html = '';
+  for (const snap of history) {
+    const players = (snap.playerIds || []).map(getPlayer).filter(Boolean);
+    html += `<details style="margin-bottom:6px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px">
+      <summary style="cursor:pointer;font-weight:400">
+        <strong>Season ${snap.season}</strong> · <span class="text-muted">${players.length} players</span>
+      </summary>
+      <div style="margin-top:8px">
+        ${['GK','DF','MF','FW'].map(grp => {
+          const ps = players.filter(p => p.position === grp);
+          if (!ps.length) return '';
+          return `<h4 style="margin-top:6px">${grp} (${ps.length})</h4>` + ps.map(p => {
+            const histAtSeason = (p.skillHistory || []).find(h => h.season === snap.season);
+            const ovr = histAtSeason ? histAtSeason.overall : playerOverall(p);
+            return `<div style="display:flex;gap:8px;align-items:center;font-size:12px;padding:2px 0"><div>${ovrPill(ovr)}</div><div style="flex:1">${playerLink(p.id)}</div><div class="text-muted" style="font-size:11px">${histAtSeason ? `age ${histAtSeason.age}` : `age ${p.age}`}</div></div>`;
+          }).join('');
+        }).join('')}
+      </div>
+    </details>`;
+  }
+  return html;
 }
 
 function toggleNTSquad(playerId) {
@@ -399,7 +426,7 @@ function renderHistoryLedgerHTML() {
     html += `<div class="history-entry" style="${struckCls}">
       <div class="he-tag">${esc(e.type)}<br>S${e.season}</div>
       <div>${body}${e.struck ? `<div class="text-muted" style="font-size:11px;margin-top:4px">struck: ${esc(e.strikeReason || '')}</div>` : ''}
-        <div style="margin-top:4px">${e.type === 'match_committed' ? `<button class="btn btn-sm" onclick="viewMatchModal('${e.id}')">View</button>` : ''}
+        <div style="margin-top:4px">${e.type === 'match_committed' ? `<button class="btn btn-sm" onclick="viewMatchModal('${e.id}')">View</button>` : ''}${e.type === 'external_match' ? `<button class="btn btn-sm" onclick="viewMatchModal('${e.matchId}')">View</button>` : ''}
         ${e.struck
           ? `<button class="btn btn-sm" onclick="if(confirm('Restore struck record?')) { unstrikeRecord('${e.id}'); refreshAll(); }">↺ Restore</button>`
           : `<button class="btn btn-sm btn-danger" onclick="askStrikeRecord('${e.id}')">Strike…</button>`}
@@ -505,6 +532,9 @@ function describeHistoryEntry(e) {
       const home = clubName(e.homeId), away = clubName(e.awayId);
       const meta = e.leagueId ? `${getLeague(e.leagueId)?.name || '?'} MD${e.matchday}` : (e.cupId ? getCup(e.cupId)?.name || '?' : '');
       return `<strong>${esc(home)} ${e.hScore}–${e.aScore} ${esc(away)}</strong> <span class="text-muted" style="font-size:11px">${esc(meta)}</span>`;
+    }
+    case 'external_match': {
+      return `<strong>${esc(e.homeName || '?')} ${e.hScore}–${e.aScore} ${esc(e.awayName || '?')}</strong> <span class="text-muted" style="font-size:11px">${esc(e.type || 'External')}${e.competition ? ' · ' + esc(e.competition) : ''}</span>`;
     }
     case 'season_ended': return `<strong>${getLeague(e.leagueId)?.name || '?'}</strong> — Champion: ${clubLink(e.championId)} · Promoted: ${(e.promoted||[]).map(clubLink).join(', ')||'—'} · Relegated: ${(e.relegated||[]).map(clubLink).join(', ')||'—'}`;
     case 'cup_won': return `<strong>${getCup(e.cupId)?.name || '?'}</strong> — Winner: ${clubLink(e.winnerId)} · Runner-up: ${clubLink(e.runnerUpId)}`;
