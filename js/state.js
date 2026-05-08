@@ -546,18 +546,38 @@ function unstrikeRecord(eventId) {
  *   Returns { apps, goals, assists, yellows, reds, motm, byClub: { clubId: {...} }, bySeason: { season: {...} } }
  * ========================================================================= */
 function playerCareerStats(playerId) {
-  const out = { apps: 0, mins: 0, goals: 0, assists: 0, yellows: 0, reds: 0, byClub: {}, bySeason: {} };
-  const matches = state.history.filter(e => e.type === 'match_committed' && !e.struck);
+  const out = {
+    apps: 0, mins: 0, goals: 0, assists: 0, yellows: 0, reds: 0,
+    byClub: {}, bySeason: {},
+    // International totals are kept separate from club career so they can
+    // be displayed as a distinct column. They're not rolled into byClub
+    // / bySeason since those are club-bound aggregates.
+    international: { apps: 0, mins: 0, goals: 0, assists: 0, yellows: 0, reds: 0 },
+  };
+  const matches = state.history.filter(e =>
+    !e.struck && (e.type === 'match_committed' || e.type === 'external_match')
+  );
   for (const m of matches) {
     const apps = (m.appearances || []).filter(a => a.playerId === playerId);
     if (!apps.length) continue;
-    const ourSide = apps[0].side;
-    const ourClubId = ourSide === 'home' ? m.homeId : m.awayId;
     const ourGoals = (m.scorers || []).filter(s => s.playerId === playerId && !s.ownGoal).length;
     const ourAssists = (m.scorers || []).filter(s => s.assistId === playerId).length;
     const ourYellows = (m.cards || []).filter(c => c.playerId === playerId && c.type === 'yellow').length;
     const ourReds = (m.cards || []).filter(c => c.playerId === playerId && c.type === 'red').length;
     const ourMins = apps.reduce((acc, a) => acc + (a.minutesPlayed || 0), 0);
+
+    if (m.type === 'external_match') {
+      out.international.apps += 1;
+      out.international.mins += ourMins;
+      out.international.goals += ourGoals;
+      out.international.assists += ourAssists;
+      out.international.yellows += ourYellows;
+      out.international.reds += ourReds;
+      continue;
+    }
+
+    const ourSide = apps[0].side;
+    const ourClubId = ourSide === 'home' ? m.homeId : m.awayId;
     out.apps += 1;
     out.mins += ourMins;
     out.goals += ourGoals;
