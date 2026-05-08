@@ -251,15 +251,25 @@ function clearDetail() {
 function viewMatchModal(matchOrEventId, opts = {}) {
   let m = null;
   if (typeof matchOrEventId === 'string') {
-    // Look up in history
-    m = state.history.find(e => e.id === matchOrEventId || e.matchId === matchOrEventId);
+    // 1) Prefer the rich external-match record over the slim history stub.
+    const ext = (state.externalMatches || []).find(e => e.id === matchOrEventId);
+    if (ext) { m = ext; opts.external = true; }
+    // 2) Then history. If the hit is an external_match stub, follow matchId
+    //    to the real record in state.externalMatches.
+    if (!m) {
+      const hit = state.history.find(e => e.id === matchOrEventId || e.matchId === matchOrEventId);
+      if (hit) {
+        if (hit.type === 'external_match' && hit.matchId) {
+          const real = (state.externalMatches || []).find(e => e.id === hit.matchId);
+          if (real) { m = real; opts.external = true; }
+        } else {
+          m = hit;
+        }
+      }
+    }
     if (!m) {
       const draft = (state.draftMatches || []).find(d => d.id === matchOrEventId);
       if (draft) { m = draft; opts.draft = true; }
-    }
-    if (!m) {
-      const ext = (state.externalMatches || []).find(e => e.id === matchOrEventId);
-      if (ext) { m = ext; opts.external = true; }
     }
   } else m = matchOrEventId;
   if (!m) return;
