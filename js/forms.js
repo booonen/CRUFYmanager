@@ -708,8 +708,11 @@ function renderExSideHTML(side) {
         ${formGroup('Strength (0–99)', `<input type="number" id="ex-${side}-str" min="0" max="99" value="${s.strength}">`)}
         ${formGroup('Name bank', formSelect(`ex-${side}-bank`, state.settings.defaultNameBank, Object.keys(state.nameBanks)))}
       </div>
-      ${formGroup(`Roster <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;font-size:11px">— optional. One player per line: <code>ROLE Name #shirt ~strength</code>. Use <code>---</code> to mark the bench. Empty = randomise.</span>`,
-        `<textarea id="ex-${side}-roster" rows="8" style="width:100%;font-family:var(--font-mono);font-size:12px" placeholder="${esc(rosterPlaceholder)}">${esc(s.customRoster || '')}</textarea>`)}
+      <div class="form-group">
+        <label>Roster</label>
+        <textarea id="ex-${side}-roster" rows="8" style="width:100%;font-family:var(--font-mono);font-size:12px" placeholder="${esc(rosterPlaceholder)}">${esc(s.customRoster || '')}</textarea>
+        <div class="form-hint">Optional. One player per line: <code>ROLE Name #shirt ~strength</code>. Use <code>---</code> to mark the bench. Empty = randomise.</div>
+      </div>
       <button class="btn btn-sm" onclick="exSideRegenerateCustom('${side}')">↻ Regenerate XI</button>
     `;
   }

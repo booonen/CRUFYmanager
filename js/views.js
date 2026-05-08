@@ -711,16 +711,17 @@ function renderPlayerLedgerHTML(playerId) {
   </div>`;
   html += `<p class="text-muted" style="font-size:11px;margin-bottom:6px">${events.length} event${events.length === 1 ? '' : 's'}</p>`;
   html += '<div class="news-list">';
+  const { matchScorer, matchAssister, matchCard } = playerMatchHelpers(playerId);
   for (const e of events.slice(0, 250)) {
     let txt = '';
     let cls = '';
     switch (e.type) {
       case 'match_committed': {
         const home = clubName(e.homeId), away = clubName(e.awayId);
-        const ourGoals = (e.scorers || []).filter(s => s.playerId === playerId && !s.ownGoal).length;
-        const ourAssists = (e.scorers || []).filter(s => s.assistId === playerId).length;
-        const yellow = (e.cards || []).filter(c => c.playerId === playerId && c.type === 'yellow').length;
-        const red = (e.cards || []).filter(c => c.playerId === playerId && c.type === 'red').length;
+        const ourGoals = (e.scorers || []).filter(s => matchScorer(s) && !s.ownGoal).length;
+        const ourAssists = (e.scorers || []).filter(matchAssister).length;
+        const yellow = (e.cards || []).filter(c => matchCard(c) && c.type === 'yellow').length;
+        const red = (e.cards || []).filter(c => matchCard(c) && c.type === 'red').length;
         const stat = [];
         if (ourGoals) stat.push(`${ourGoals}G`);
         if (ourAssists) stat.push(`${ourAssists}A`);
@@ -733,8 +734,8 @@ function renderPlayerLedgerHTML(playerId) {
         break;
       }
       case 'external_match': {
-        const ourGoals = (e.scorers || []).filter(s => s.playerId === playerId && !s.ownGoal).length;
-        const ourAssists = (e.scorers || []).filter(s => s.assistId === playerId).length;
+        const ourGoals = (e.scorers || []).filter(s => matchScorer(s) && !s.ownGoal).length;
+        const ourAssists = (e.scorers || []).filter(matchAssister).length;
         const stat = [];
         if (ourGoals) stat.push(`${ourGoals}G`);
         if (ourAssists) stat.push(`${ourAssists}A`);

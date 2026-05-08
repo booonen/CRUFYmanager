@@ -494,11 +494,12 @@ function historyForClub(clubId) {
 }
 
 function historyForPlayer(playerId) {
+  const { matchAppearance, matchScorer } = playerMatchHelpers(playerId);
   return state.history.filter(e => {
     if (e.struck) return false;
     if ((e.type === 'match_committed' || e.type === 'external_match') && (
-        (e.appearances || []).some(a => a.playerId === playerId) ||
-        (e.scorers || []).some(s => s.playerId === playerId))) return true;
+        (e.appearances || []).some(matchAppearance) ||
+        (e.scorers || []).some(matchScorer))) return true;
     if (e.type === 'player_retired' && e.playerId === playerId) return true;
     if (e.type === 'player_to_manager' && e.playerId === playerId) return true;
     if (e.type === 'player_signed' && e.playerId === playerId) return true;
@@ -545,25 +546,43 @@ function unstrikeRecord(eventId) {
  *
  *   Returns { apps, goals, assists, yellows, reds, motm, byClub: { clubId: {...} }, bySeason: { season: {...} } }
  * ========================================================================= */
+/* Predicates that match a player against the appearance / scorer / card
+ * records in a match. Re-imported rosters get fresh ids while old external
+ * matches still reference the old ones; we treat any record whose id isn't
+ * in state.players as "orphan" and fall back to a name match for it. This
+ * credits the re-imported player without double-crediting any active
+ * player who happens to share the name. */
+function playerMatchHelpers(playerId) {
+  const me = getPlayer(playerId);
+  const myName = me?.name || (me ? `${me.firstName || ''} ${me.lastName || ''}`.trim() : '');
+  const knownIds = new Set(state.players.map(p => p.id));
+  const isOrphan = id => !id || !knownIds.has(id);
+  return {
+    matchAppearance: a => a.playerId === playerId || (myName && a.playerName === myName && isOrphan(a.playerId)),
+    matchScorer:    s => s.playerId === playerId || (myName && s.playerName === myName && isOrphan(s.playerId)),
+    matchAssister:  s => s.assistId === playerId || (myName && s.assistName === myName && isOrphan(s.assistId)),
+    matchCard:      c => c.playerId === playerId || (myName && c.playerName === myName && isOrphan(c.playerId)),
+  };
+}
+
 function playerCareerStats(playerId) {
   const out = {
     apps: 0, mins: 0, goals: 0, assists: 0, yellows: 0, reds: 0,
     byClub: {}, bySeason: {},
-    // International totals are kept separate from club career so they can
-    // be displayed as a distinct column. They're not rolled into byClub
-    // / bySeason since those are club-bound aggregates.
     international: { apps: 0, mins: 0, goals: 0, assists: 0, yellows: 0, reds: 0 },
   };
+  const { matchAppearance, matchScorer, matchAssister, matchCard } = playerMatchHelpers(playerId);
+
   const matches = state.history.filter(e =>
     !e.struck && (e.type === 'match_committed' || e.type === 'external_match')
   );
   for (const m of matches) {
-    const apps = (m.appearances || []).filter(a => a.playerId === playerId);
+    const apps = (m.appearances || []).filter(matchAppearance);
     if (!apps.length) continue;
-    const ourGoals = (m.scorers || []).filter(s => s.playerId === playerId && !s.ownGoal).length;
-    const ourAssists = (m.scorers || []).filter(s => s.assistId === playerId).length;
-    const ourYellows = (m.cards || []).filter(c => c.playerId === playerId && c.type === 'yellow').length;
-    const ourReds = (m.cards || []).filter(c => c.playerId === playerId && c.type === 'red').length;
+    const ourGoals = (m.scorers || []).filter(s => matchScorer(s) && !s.ownGoal).length;
+    const ourAssists = (m.scorers || []).filter(matchAssister).length;
+    const ourYellows = (m.cards || []).filter(c => matchCard(c) && c.type === 'yellow').length;
+    const ourReds = (m.cards || []).filter(c => matchCard(c) && c.type === 'red').length;
     const ourMins = apps.reduce((acc, a) => acc + (a.minutesPlayed || 0), 0);
 
     if (m.type === 'external_match') {
