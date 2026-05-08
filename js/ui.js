@@ -96,6 +96,7 @@ function toggleSavesDropdown(ev) {
     <div class="saves-dropdown-item" onclick="closeSavesDropdown(); exportSave()">⤓ Export save (.json)</div>
     <div class="saves-dropdown-item" onclick="closeSavesDropdown(); document.getElementById('file-input').click()">⤒ Import save…</div>
     <div class="saves-dropdown-item" onclick="closeSavesDropdown(); document.getElementById('roster-input').click()">⤒ Import roster (NT/club)…</div>
+    <div class="saves-dropdown-item" onclick="closeSavesDropdown(); const n = relinkOrphanPlayerIds(); showToast(n ? `Re-linked ${n} historic record(s)` : 'No orphan records found', n ? 'success' : 'info'); refreshAll();">↻ Re-link orphan player IDs</div>
     <div class="saves-dropdown-divider"></div>
     <div class="saves-dropdown-item" onclick="closeSavesDropdown(); saveStateNow(); showToast('Save flushed','success')">💾 Save now</div>
     <div class="saves-dropdown-divider"></div>
@@ -312,6 +313,10 @@ function viewMatchModal(matchOrEventId, opts = {}) {
   body += `<div class="match-stats-row"><div class="stat-h">${st.foulsH ?? '-'}</div><div class="stat-l">Fouls</div><div class="stat-a">${st.foulsA ?? '-'}</div></div>`;
   body += `<div class="match-stats-row"><div class="stat-h">${st.yellowsH ?? 0} ▪ / ${st.redsH ?? 0} ■</div><div class="stat-l">Cards</div><div class="stat-a">${st.yellowsA ?? 0} ▪ / ${st.redsA ?? 0} ■</div></div>`;
 
+  // Lineups (XI + bench, with sub markers). Best-effort from m.homeXI / m.awayXI.
+  const lineupsHTML = renderMatchLineups(m, isExternalView);
+  if (lineupsHTML) body += lineupsHTML;
+
   // Commentary log — reconstruct from slim data if `events` is missing
   const events = (m.events && m.events.length) ? m.events : reconstructMatchEvents(m);
   body += `<div class="commentary-log">`;
@@ -346,6 +351,83 @@ function viewMatchModal(matchOrEventId, opts = {}) {
     `;
   }
   openModal({ title: `${home.name} vs ${away.name}`, body, footer, wide: true });
+}
+
+/* Render the match's two lineups (XI + bench) with sub markers. Handles both
+ * shapes: external matches embed slot.player; league matches use slot.playerId
+ * (resolved via getPlayer). Returns '' if neither side has lineup data. */
+function renderMatchLineups(m, isExternalView) {
+  const homeXI = m.homeXI; const awayXI = m.awayXI;
+  if ((!homeXI || !homeXI.slots) && (!awayXI || !awayXI.slots)) return '';
+
+  const subs = m.subs || [];
+  const offByKey = side => {
+    const map = {};
+    for (const s of subs.filter(x => x.side === side)) {
+      const k = s.offId || `__${s.offName}`;
+      map[k] = { minute: s.minute, replacedBy: s.onName };
+    }
+    return map;
+  };
+  const onByKey = side => subs.filter(x => x.side === side).map(s => ({
+    name: s.onName, minute: s.minute, replaced: s.offName,
+  }));
+
+  const slotPlayer = slot => {
+    if (slot.player) return slot.player;
+    if (slot.playerId) return getPlayer(slot.playerId);
+    return null;
+  };
+  const benchPlayer = b => b.player || (b.playerId ? getPlayer(b.playerId) : null);
+
+  const renderSide = (xi, side, sideLabel) => {
+    if (!xi || !xi.slots) return `<div><strong>${esc(sideLabel)}</strong><div class="text-muted" style="font-size:12px">(no lineup)</div></div>`;
+    const offMap = offByKey(side);
+    const xiRows = xi.slots.map(slot => {
+      const p = slotPlayer(slot);
+      if (!p) return '';
+      const k = p.id || `__${p.name}`;
+      const subbed = offMap[k];
+      const shirt = p.shirtNumber ? `#${p.shirtNumber}` : '';
+      const name = subbed
+        ? `<span style="text-decoration:line-through;color:var(--text-muted)">${esc(p.name)}</span> <span class="text-muted" style="font-size:11px">→ ${esc(subbed.replacedBy)} (${subbed.minute}')</span>`
+        : esc(p.name);
+      return `<div style="display:flex;gap:6px;font-size:12px;padding:1px 0">
+        <span class="text-muted" style="font-family:var(--font-mono);width:32px">${slot.role}</span>
+        <span class="text-muted" style="font-family:var(--font-mono);width:30px">${esc(shirt)}</span>
+        <span style="flex:1">${name}</span>
+      </div>`;
+    }).join('');
+    const benches = (xi.bench || []).map(b => {
+      const p = benchPlayer(b);
+      if (!p) return '';
+      const came = onByKey(side).find(s => s.name === p.name);
+      const shirt = p.shirtNumber ? `#${p.shirtNumber}` : '';
+      const name = came
+        ? `<span>${esc(p.name)}</span> <span class="text-muted" style="font-size:11px">on ${came.minute}'</span>`
+        : `<span class="text-muted">${esc(p.name)}</span>`;
+      return `<div style="display:flex;gap:6px;font-size:12px;padding:1px 0">
+        <span class="text-muted" style="font-family:var(--font-mono);width:32px">${p.role || ''}</span>
+        <span class="text-muted" style="font-family:var(--font-mono);width:30px">${esc(shirt)}</span>
+        <span style="flex:1">${name}</span>
+      </div>`;
+    }).join('');
+    return `<div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+        <strong>${esc(sideLabel)}</strong>
+        <span class="text-muted" style="font-size:11px">${esc(xi.formation || '')}</span>
+      </div>
+      <div>${xiRows}</div>
+      ${benches ? `<div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.04em;margin-top:8px">Bench</div><div>${benches}</div>` : ''}
+    </div>`;
+  };
+
+  const homeLabel = isExternalView ? (m.homeName || 'Home') : clubName(m.homeId);
+  const awayLabel = isExternalView ? (m.awayName || 'Away') : clubName(m.awayId);
+  return `<div class="match-lineups" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;padding:12px;background:var(--bg-input);border-radius:var(--radius-sm)">
+    ${renderSide(homeXI, 'home', homeLabel)}
+    ${renderSide(awayXI, 'away', awayLabel)}
+  </div>`;
 }
 
 function rerollDraft(draftId) {

@@ -391,8 +391,13 @@ function handleRosterImport(ev) {
         addedManagers++;
       }
 
+      // After a re-import, history records still reference the OLD player
+      // ids. Relink any orphan ids to the freshly-imported players by name
+      // and rebuild seasonStats so career / squad views populate.
+      const relinked = relinkOrphanPlayerIds();
       await saveStateNow();
-      showToast(`Imported ${addedPlayers} players, ${addedManagers} staff`, 'success');
+      const linkMsg = relinked ? `, re-linked ${relinked} historic record(s)` : '';
+      showToast(`Imported ${addedPlayers} players, ${addedManagers} staff${linkMsg}`, 'success');
       refreshAll();
     } catch (err) {
       showToast('Roster import failed: ' + err.message, 'error');
@@ -518,6 +523,84 @@ function historyForManager(managerId) {
     if (e.type === 'player_to_manager' && e.managerId === managerId) return true;
     return false;
   });
+}
+
+/* Walk history and rewrite any orphan playerId on appearances / scorers /
+ * assists / cards to the current player whose name matches uniquely. After
+ * the remap, rebuild every active player's seasonStats counters from the
+ * current season's matches so squad lists and season cards reflect the
+ * relinked records too. Returns { relinked, statsRebuilt }.
+ *
+ * Call this after a roster re-import that gave players fresh ids. The
+ * playerCareerStats orphan-fallback already covers display-time matching;
+ * this is the one-shot data fix that also restores seasonStats. */
+function relinkOrphanPlayerIds() {
+  const byName = new Map();
+  for (const p of state.players) {
+    const k = (p.name || `${p.firstName || ''} ${p.lastName || ''}`.trim()).trim();
+    if (!k) continue;
+    if (!byName.has(k)) byName.set(k, []);
+    byName.get(k).push(p);
+  }
+  const knownIds = new Set(state.players.map(p => p.id));
+  let relinked = 0;
+  const remap = (rec, idField, nameField) => {
+    if (rec[idField] && knownIds.has(rec[idField])) return;
+    const name = (rec[nameField] || '').trim();
+    if (!name) return;
+    const cands = byName.get(name) || [];
+    if (cands.length !== 1) return; // skip ambiguous and not-found
+    rec[idField] = cands[0].id;
+    relinked++;
+  };
+  for (const e of state.history) {
+    if (e.type !== 'match_committed' && e.type !== 'external_match') continue;
+    for (const ap of e.appearances || []) remap(ap, 'playerId', 'playerName');
+    for (const sc of e.scorers || []) {
+      remap(sc, 'playerId', 'playerName');
+      if (sc.assistName) remap(sc, 'assistId', 'assistName');
+    }
+    for (const c of e.cards || []) remap(c, 'playerId', 'playerName');
+  }
+
+  // Rebuild current-season seasonStats from the (now-relinked) history.
+  for (const p of state.players) {
+    p.seasonStats = { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+  }
+  const currentSeason = state.settings.season;
+  for (const e of state.history) {
+    if (e.struck || e.season !== currentSeason) continue;
+    if (e.type !== 'match_committed' && e.type !== 'external_match') continue;
+    for (const ap of e.appearances || []) {
+      if (!ap.playerId) continue;
+      const p = getPlayer(ap.playerId);
+      if (p) p.seasonStats.apps = (p.seasonStats.apps || 0) + 1;
+    }
+    for (const sc of e.scorers || []) {
+      if (sc.playerId && !sc.ownGoal) {
+        const p = getPlayer(sc.playerId);
+        if (p) p.seasonStats.goals = (p.seasonStats.goals || 0) + 1;
+      }
+      if (sc.assistId) {
+        const a = getPlayer(sc.assistId);
+        if (a) a.seasonStats.assists = (a.seasonStats.assists || 0) + 1;
+      }
+    }
+    for (const c of e.cards || []) {
+      if (!c.playerId) continue;
+      const p = getPlayer(c.playerId);
+      if (!p) continue;
+      if (c.type === 'yellow') p.seasonStats.yellows = (p.seasonStats.yellows || 0) + 1;
+      else if (c.type === 'red') p.seasonStats.reds = (p.seasonStats.reds || 0) + 1;
+    }
+  }
+  // Mark current-season external matches as having had stats applied so a
+  // future strike can roll back correctly.
+  for (const m of (state.externalMatches || [])) {
+    if (m.season === currentSeason) m.statsApplied = true;
+  }
+  saveState();
+  return relinked;
 }
 
 function strikeRecord(eventId, reason) {

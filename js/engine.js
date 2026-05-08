@@ -1901,7 +1901,9 @@ function scriptedMatch({
     const benchAvail = ((xi && xi.bench) || []).map(b => b.player).filter(Boolean).slice();
     if (!benchAvail.length) continue;
     const onPitch = new Set(side === 'home' ? hPlayers : aPlayers);
-    const numSubs = Math.min(pickInt(1, 3), benchAvail.length);
+    // External matches: each side always uses all three substitutions when
+    // there's bench depth. Capped only by the bench size.
+    const numSubs = Math.min(3, benchAvail.length);
     const subMins = new Set();
     let safety = 0;
     while (subMins.size < numSubs && safety < 50) { subMins.add(pickInt(55, 86)); safety++; }
@@ -2112,6 +2114,35 @@ function scriptedMatch({
     isExternal: true,
     ts: Date.now(),
   };
+}
+
+/* Auto-pick a scoreline for an external match given two XIs. Used when the
+ * user wants to "auto-simulate" a friendly without supplying the score.
+ * Stronger XI gets a higher expected goals; goals are sampled from a
+ * Poisson process (Knuth's algorithm, capped at 8). */
+function autoScoreFromXIs(homeXI, awayXI, { homeAdvantage = 0.2 } = {}) {
+  const avgRating = xi => {
+    const players = (xi?.slots || []).map(s => s.player).filter(Boolean);
+    if (!players.length) return 50;
+    return players.reduce((acc, p) => {
+      const a = p.attrs || {};
+      return acc + ((a.shooting || 50) + (a.defending || 50) + (a.passing || 50) + (a.mental || 50)) / 4;
+    }, 0) / players.length;
+  };
+  const hStr = avgRating(homeXI);
+  const aStr = avgRating(awayXI);
+  // ±1 swing from a 30-point gap. Equal teams ~ 1.3 expected goals each.
+  const baseRate = 1.3;
+  const diff = (hStr - aStr) / 30;
+  const xgH = Math.max(0.1, baseRate + diff + homeAdvantage);
+  const xgA = Math.max(0.1, baseRate - diff);
+  const samplePoisson = lambda => {
+    const L = Math.exp(-lambda);
+    let k = 0, p = 1;
+    do { k++; p *= rand(); } while (p > L && k < 9);
+    return k - 1;
+  };
+  return { hScore: samplePoisson(xgH), aScore: samplePoisson(xgA) };
 }
 
 /* Build a synthetic 11-player XI from a strength target, formation, and

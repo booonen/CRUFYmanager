@@ -633,6 +633,7 @@ function openExternalModal() {
     home: { source: nat ? 'nt' : 'custom', clubId: null, customName: nat || 'Home team', formation: DEFAULT_FORMATION, xi: null, strength: 65, customRoster: '' },
     away: { source: 'custom', clubId: null, customName: '', formation: DEFAULT_FORMATION, xi: null, strength: 60, customRoster: '' },
     hScore: 0, aScore: 0,
+    autoScore: false,
     goesToET: false, goesToPens: false,
     hPenScore: 0, aPenScore: 0,
   };
@@ -658,16 +659,19 @@ function renderExternalModal() {
     </div>
 
     <h4>Final score</h4>
-    <div class="form-row-3">
+    <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:13px;margin-bottom:8px">
+      <input type="checkbox" id="ex-autoscore" ${s.autoScore ? 'checked' : ''} onchange="exFlagToggle('autoScore', this.checked)"> Auto-simulate scoreline (let the engine pick)
+    </label>
+    <div class="form-row-3" style="display:${s.autoScore ? 'none' : 'grid'}">
       ${formGroup(s.home.customName || 'Home', `<input type="number" id="ex-h" min="0" max="20" value="${s.hScore}">`)}
       <div class="form-group" style="display:flex;align-items:end;justify-content:center"><span class="text-muted">–</span></div>
       ${formGroup(s.away.customName || 'Away', `<input type="number" id="ex-a" min="0" max="20" value="${s.aScore}">`)}
     </div>
     <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:13px">
-      <input type="checkbox" id="ex-toET" ${s.goesToET ? 'checked' : ''} onchange="exFlagToggle('goesToET', this.checked)"> Match went to extra time
+      <input type="checkbox" id="ex-toET" ${s.goesToET ? 'checked' : ''} ${s.autoScore ? 'disabled' : ''} onchange="exFlagToggle('goesToET', this.checked)"> Match went to extra time
     </label>
     <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:13px;margin-top:4px">
-      <input type="checkbox" id="ex-toPens" ${s.goesToPens ? 'checked' : ''} onchange="exFlagToggle('goesToPens', this.checked)"> Decided on penalties
+      <input type="checkbox" id="ex-toPens" ${s.goesToPens ? 'checked' : ''} ${s.autoScore ? 'disabled' : ''} onchange="exFlagToggle('goesToPens', this.checked)"> Decided on penalties
     </label>
     <div class="form-row" id="ex-pens-row" style="display:${s.goesToPens ? 'grid' : 'none'};margin-top:8px">
       ${formGroup('Pens (home)', `<input type="number" id="ex-hpen" min="0" max="20" value="${s.hPenScore}">`)}
@@ -848,19 +852,24 @@ function generateExternalAndPreview() {
   refreshExSideXI('away');
   const s = _exDraftState;
   if (!s.home.xi || !s.away.xi) { showToast('Both sides need a starting XI', 'error'); return; }
-  // Final-score sanity
-  if (s.goesToPens && s.hScore !== s.aScore) {
-    if (!confirm(`The score ${s.hScore}-${s.aScore} isn't level — penalties usually decide drawn ties. Generate anyway?`)) return;
+  let { hScore, aScore, goesToET, goesToPens, hPenScore, aPenScore } = s;
+  if (s.autoScore) {
+    // Engine picks the scoreline from team strengths. Skip ET/pens for now —
+    // auto-simulated matches always end at 90+ stoppage.
+    ({ hScore, aScore } = autoScoreFromXIs(s.home.xi, s.away.xi));
+    goesToET = false; goesToPens = false; hPenScore = 0; aPenScore = 0;
+  } else if (goesToPens && hScore !== aScore) {
+    if (!confirm(`The score ${hScore}-${aScore} isn't level — penalties usually decide drawn ties. Generate anyway?`)) return;
   }
   const draft = scriptedMatch({
     homeName: s.home.customName,
     awayName: s.away.customName,
     homeXI: s.home.xi,
     awayXI: s.away.xi,
-    hScore: s.hScore, aScore: s.aScore,
+    hScore, aScore,
     type: s.type, competition: s.competition,
-    goesToET: s.goesToET, goesToPens: s.goesToPens,
-    hPenScore: s.hPenScore, aPenScore: s.aPenScore,
+    goesToET, goesToPens,
+    hPenScore, aPenScore,
   });
   if (!draft) return;
   // Preview the report; user can save / re-roll
