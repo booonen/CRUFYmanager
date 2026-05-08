@@ -1882,14 +1882,66 @@ function scriptedMatch({
   const events = [];
   events.push({ minute: 0, type: 'kickoff', icon: '', text: templ(pick(COMMENTARY.kickoff), { hometeam: homeName, awayteam: awayName, stadium: 'a neutral venue', attendance: pickInt(15000, 80000).toLocaleString() }) });
 
-  // Pick goal-scorers and minutes
-  const scorers = [];
   const hPlayers = (homeXI?.slots || []).map(s => s.player).filter(Boolean);
   const aPlayers = (awayXI?.slots || []).map(s => s.player).filter(Boolean);
   if (!hPlayers.length || !aPlayers.length) {
     showToast('Both XIs need at least one player', 'error');
     return null;
   }
+
+  // Substitutions FIRST so subsequent picks (scorers, foulers, assisters)
+  // can be gated on who is actually on the pitch at any given minute.
+  // 1-3 per side at minutes 55-86, drawn from each side's bench, preferring
+  // same-position swaps. Subs-on are tracked separately so they become
+  // eligible to score / commit fouls only from the moment they enter.
+  const subs = [];
+  const sideOnEntries = { home: [], away: [] }; // [{minute, player}]
+  for (const side of ['home', 'away']) {
+    const xi = side === 'home' ? homeXI : awayXI;
+    const benchAvail = ((xi && xi.bench) || []).map(b => b.player).filter(Boolean).slice();
+    if (!benchAvail.length) continue;
+    const onPitch = new Set(side === 'home' ? hPlayers : aPlayers);
+    const numSubs = Math.min(pickInt(1, 3), benchAvail.length);
+    const subMins = new Set();
+    let safety = 0;
+    while (subMins.size < numSubs && safety < 50) { subMins.add(pickInt(55, 86)); safety++; }
+    for (const min of Array.from(subMins).sort((a, b) => a - b)) {
+      const candidatesOff = Array.from(onPitch).filter(p => p.position !== 'GK');
+      if (!candidatesOff.length) break;
+      const off = pick(candidatesOff);
+      const sameRole = benchAvail.filter(b => b.position === off.position);
+      const on = sameRole.length ? sameRole[0] : benchAvail[0];
+      if (!on) break;
+      onPitch.delete(off);
+      onPitch.add(on);
+      benchAvail.splice(benchAvail.indexOf(on), 1);
+      sideOnEntries[side].push({ minute: min, player: on });
+      subs.push({
+        side, minute: min, reason: 'tactical',
+        offId: off.id || null, offName: off.name,
+        onId: on.id || null, onName: on.name,
+      });
+      events.push({
+        minute: min, type: 'sub', side, icon: '⇄',
+        text: `${side === 'home' ? homeName : awayName} substitution: ${off.name} off, ${on.name} on.`
+      });
+    }
+  }
+
+  // Pool of players on pitch for `side` at `minute`: starters minus those
+  // subbed off at or before the minute, plus subs-on who entered at or
+  // before the minute.
+  const playerKey = p => p.id || `__${p.name}`;
+  const availablePlayersAt = (side, minute) => {
+    const starters = side === 'home' ? hPlayers : aPlayers;
+    const sideSubs = subs.filter(s => s.side === side && s.minute <= minute);
+    const offKeys = new Set(sideSubs.map(s => s.offId || `__${s.offName}`));
+    const onPlayers = sideOnEntries[side].filter(e => e.minute <= minute).map(e => e.player);
+    return starters.filter(p => !offKeys.has(playerKey(p))).concat(onPlayers);
+  };
+
+  // Pick goal-scorers and minutes
+  const scorers = [];
   const goalEvents = [];
   for (let i = 0; i < hScore; i++) goalEvents.push({ side: 'home' });
   for (let i = 0; i < aScore; i++) goalEvents.push({ side: 'away' });
@@ -1908,14 +1960,15 @@ function scriptedMatch({
 
   let runH = 0, runA = 0;
   for (const g of goalEvents) {
-    const xi = g.side === 'home' ? hPlayers : aPlayers;
-    const weights = xi.map(p => Math.max((p.attrs?.shooting || 50) + (p.position === 'FW' ? 35 : p.position === 'MF' ? 12 : 0), 1));
-    const scorer = weightedPick(xi, weights) || xi[0];
+    const pool = availablePlayersAt(g.side, g.minute);
+    if (!pool.length) continue;
+    const weights = pool.map(p => Math.max((p.attrs?.shooting || 50) + (p.position === 'FW' ? 35 : p.position === 'MF' ? 12 : 0), 1));
+    const scorer = weightedPick(pool, weights) || pool[0];
     const isPenalty = rand() < 0.10;
     const isOG = !isPenalty && rand() < 0.03;
     let assister = null;
     if (!isPenalty && !isOG && rand() < 0.7) {
-      const others = xi.filter(p => p !== scorer);
+      const others = pool.filter(p => p !== scorer);
       if (others.length) {
         const aw = others.map(p => Math.max((p.attrs?.passing || 50) + (p.attrs?.technique || 50), 1));
         assister = weightedPick(others, aw);
@@ -1941,67 +1994,31 @@ function scriptedMatch({
     events.push({ minute: g.minute, type: isPenalty ? 'penalty' : 'goal', side: g.side, icon: '⚽', score: `${runH}–${runA}`, text });
   }
 
-  // Cards: 2-5 yellows + occasional red
+  // Cards: 2-5 yellows + occasional red. Foulers must be on the pitch at the
+  // card minute (so a subbed-off player can't pick up a card).
   const cards = [];
   const numCards = pickInt(2, 5);
   const cardMins = new Set();
   for (let i = 0; i < numCards; i++) {
     const side = rand() < 0.5 ? 'home' : 'away';
-    const xi = side === 'home' ? hPlayers : aPlayers;
-    const cands = xi.filter(p => p.position !== 'GK');
-    if (!cands.length) continue;
-    const fouler = pick(cands);
     let m;
     let safety = 0;
     do { m = pickInt(8, totalMin - 4); safety++; } while (cardMins.has(m) && safety < 100);
+    const cands = availablePlayersAt(side, m).filter(p => p.position !== 'GK');
+    if (!cands.length) continue;
     cardMins.add(m);
+    const fouler = pick(cands);
     cards.push({ playerId: fouler.id || null, playerName: fouler.name, side, type: 'yellow', minute: m, reason: 'foul' });
     events.push({ minute: m, type: 'yellow', side, icon: '▪', text: templ(pick(COMMENTARY.yellow), { fouler: fouler.name, fouled: 'an opponent' }) });
   }
   if (rand() < 0.10) {
     const side = rand() < 0.5 ? 'home' : 'away';
-    const xi = side === 'home' ? hPlayers : aPlayers;
-    const cands = xi.filter(p => p.position !== 'GK');
+    const m = pickInt(20, totalMin);
+    const cands = availablePlayersAt(side, m).filter(p => p.position !== 'GK');
     if (cands.length) {
       const fouler = pick(cands);
-      const m = pickInt(20, totalMin);
       cards.push({ playerId: fouler.id || null, playerName: fouler.name, side, type: 'red', minute: m, reason: 'direct_red' });
       events.push({ minute: m, type: 'red', side, icon: '■', text: templ(pick(COMMENTARY.red), { fouler: fouler.name, fouled: 'an opponent' }) });
-    }
-  }
-
-  // Substitutions: 1-3 per side, drawn from each side's bench at minutes 55-86.
-  // Goals/cards above were already assigned to starters; in rare cases a player
-  // could "score" after being subbed off — accepted as cosmetic since this
-  // generator doesn't simulate per-minute pitch state.
-  const subs = [];
-  for (const side of ['home', 'away']) {
-    const xi = side === 'home' ? homeXI : awayXI;
-    const benchAvail = ((xi && xi.bench) || []).map(b => b.player).filter(Boolean).slice();
-    if (!benchAvail.length) continue;
-    const onPitch = new Set(side === 'home' ? hPlayers : aPlayers);
-    const numSubs = Math.min(pickInt(1, 3), benchAvail.length);
-    const subMins = new Set();
-    let safety = 0;
-    while (subMins.size < numSubs && safety < 50) { subMins.add(pickInt(55, 86)); safety++; }
-    for (const min of Array.from(subMins).sort((a, b) => a - b)) {
-      const candidatesOff = Array.from(onPitch).filter(p => p.position !== 'GK');
-      if (!candidatesOff.length) break;
-      const off = pick(candidatesOff);
-      const sameRole = benchAvail.filter(b => b.position === off.position);
-      const on = sameRole.length ? sameRole[0] : benchAvail[0];
-      if (!on) break;
-      onPitch.delete(off);
-      benchAvail.splice(benchAvail.indexOf(on), 1);
-      subs.push({
-        side, minute: min, reason: 'tactical',
-        offId: off.id || null, offName: off.name,
-        onId: on.id || null, onName: on.name,
-      });
-      events.push({
-        minute: min, type: 'sub', side, icon: '⇄',
-        text: `${side === 'home' ? homeName : awayName} substitution: ${off.name} off, ${on.name} on.`
-      });
     }
   }
 
