@@ -687,6 +687,12 @@ function renderExSideHTML(side) {
   const xiSummary = xi && xi.slots.length
     ? xi.slots.map(slot => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px dashed var(--border)"><span><span class="text-muted" style="font-family:var(--font-mono);font-size:11px;width:32px;display:inline-block">${slot.role}</span> ${esc(slot.player?.name || '—')}</span><span class="text-muted" style="font-family:var(--font-mono);font-size:11px">${slot.player ? playerOverall(slot.player) : '—'}</span></div>`).join('')
     : '<p class="text-muted" style="font-size:12px">No XI yet — pick a source above.</p>';
+  const benchSummary = xi && xi.bench && xi.bench.length
+    ? `<h4 style="margin-top:12px;font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Bench (${xi.bench.length})</h4>
+       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;background:var(--bg-input)">
+         ${xi.bench.map(b => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span><span class="text-muted" style="font-family:var(--font-mono);font-size:11px;width:32px;display:inline-block">${b.player?.role || '—'}</span> ${esc(b.player?.name || '—')}</span><span class="text-muted" style="font-family:var(--font-mono);font-size:11px">${b.player ? playerOverall(b.player) : '—'}</span></div>`).join('')}
+       </div>`
+    : '';
 
   let sourceForm = '';
   const ntAvail = (state.settings.ntSquad || []).length >= 11;
@@ -695,12 +701,15 @@ function renderExSideHTML(side) {
   } else if (s.source === 'club') {
     sourceForm = `${formGroup('Club', formSelect(`ex-${side}-club`, s.clubId || '', [{value:'', label:'(pick a club)'}, ...state.clubs.map(c => ({value: c.id, label: c.name}))]))}<script>document.getElementById('ex-${side}-club').addEventListener('change', e => exSideChanged('${side}', 'clubId', e.target.value));</script>`;
   } else {
+    const rosterPlaceholder = `GK John Goalie #1\nRB Quick Smith #2\nCB Rock Solid #4\nCB Tank Big #5\nLB Lefty Run #3\nCDM Anchor Mid #6\nCM Pass Master #8\nCAM Creative Ace #10\nRW Wing Wizard #7\nLW Speed Demon #11\nST Goal Striker #9\n---\nGK Backup Keeper #13\nCB Reserve Wall #14\nCM Bench Mid #16\nST Sub Forward #19`;
     sourceForm = `
       ${formGroup('Team name', `<input type="text" id="ex-${side}-name" value="${esc(s.customName)}" placeholder="e.g. Vexillium FC">`)}
       <div class="form-row">
         ${formGroup('Strength (0–99)', `<input type="number" id="ex-${side}-str" min="0" max="99" value="${s.strength}">`)}
         ${formGroup('Name bank', formSelect(`ex-${side}-bank`, state.settings.defaultNameBank, Object.keys(state.nameBanks)))}
       </div>
+      ${formGroup(`Roster <span class="text-muted" style="text-transform:none;letter-spacing:0;font-weight:400;font-size:11px">— optional. One player per line: <code>ROLE Name #shirt ~strength</code>. Use <code>---</code> to mark the bench. Empty = randomise.</span>`,
+        `<textarea id="ex-${side}-roster" rows="8" style="width:100%;font-family:var(--font-mono);font-size:12px" placeholder="${esc(rosterPlaceholder)}">${esc(s.customRoster || '')}</textarea>`)}
       <button class="btn btn-sm" onclick="exSideRegenerateCustom('${side}')">↻ Regenerate XI</button>
     `;
   }
@@ -724,6 +733,7 @@ function renderExSideHTML(side) {
     <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;background:var(--bg-input)">
       ${xiSummary}
     </div>
+    ${benchSummary}
   </div>`;
 }
 
@@ -780,6 +790,8 @@ function captureExFormState() {
     if (strEl) ss.strength = clamp(parseInt(strEl.value) || 60, 0, 99);
     const bankEl = document.getElementById(`ex-${side}-bank`);
     if (bankEl) ss.nameBank = bankEl.value;
+    const rosterEl = document.getElementById(`ex-${side}-roster`);
+    if (rosterEl) ss.customRoster = rosterEl.value;
   }
 }
 
@@ -801,12 +813,26 @@ function refreshExSideXI(side) {
       s.xi = null;
     }
   } else {
-    s.xi = synthesizeXI({ formation: s.formation, strength: s.strength, nameBank: s.nameBank || state.settings.defaultNameBank, nationality: '', teamName: s.customName });
+    const bank = s.nameBank || state.settings.defaultNameBank;
+    if ((s.customRoster || '').trim()) {
+      s.xi = parseCustomRoster(s.customRoster, {
+        formation: s.formation,
+        baseStrength: s.strength,
+        nameBank: bank,
+        nationality: '',
+      });
+    } else {
+      s.xi = synthesizeXI({ formation: s.formation, strength: s.strength, nameBank: bank, nationality: '', teamName: s.customName });
+    }
   }
 }
 
 function generateExternalAndPreview() {
   captureExFormState();
+  // Re-derive XIs from the latest captured state so unsaved roster edits
+  // (typed but no Regenerate click) are reflected in the generated match.
+  refreshExSideXI('home');
+  refreshExSideXI('away');
   const s = _exDraftState;
   if (!s.home.xi || !s.away.xi) { showToast('Both sides need a starting XI', 'error'); return; }
   // Final-score sanity

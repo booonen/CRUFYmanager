@@ -2118,30 +2118,95 @@ function scriptedMatch({
  * optional name bank. Used for "Custom" external opponents. */
 function synthesizeXI({ formation = DEFAULT_FORMATION, strength = 60, nameBank = 'Generic English', nationality = '', teamName = 'Custom XI' }) {
   const formSlots = FORMATIONS[formation] || FORMATIONS[DEFAULT_FORMATION];
-  const bank = (state && state.nameBanks && state.nameBanks[nameBank]) || DEFAULT_NAME_BANKS[nameBank] || DEFAULT_NAME_BANKS['Generic English'];
-  const attr = (mean, w = 1) => clamp(Math.round(randNorm(mean * w, 8)), 1, 99);
-  const attrsFor = grp => {
-    if (grp === 'GK') return { pace: attr(strength, 0.6), strength: attr(strength, 0.85), technique: attr(strength, 0.55), passing: attr(strength, 0.65), defending: attr(strength, 0.5), shooting: attr(strength, 0.2), mental: attr(strength, 0.95), goalkeeping: attr(strength, 1.15) };
-    if (grp === 'DF') return { pace: attr(strength, 0.95), strength: attr(strength, 1.0), technique: attr(strength, 0.75), passing: attr(strength, 0.85), defending: attr(strength, 1.15), shooting: attr(strength, 0.4), mental: attr(strength, 0.9), goalkeeping: 5 };
-    if (grp === 'MF') return { pace: attr(strength, 0.9), strength: attr(strength, 0.85), technique: attr(strength, 1.05), passing: attr(strength, 1.1), defending: attr(strength, 0.7), shooting: attr(strength, 0.85), mental: attr(strength, 0.95), goalkeeping: 5 };
-    return { pace: attr(strength, 1.1), strength: attr(strength, 1.0), technique: attr(strength, 1.05), passing: attr(strength, 0.85), defending: attr(strength, 0.45), shooting: attr(strength, 1.15), mental: attr(strength, 0.9), goalkeeping: 5 };
-  };
-  const synthPlayer = (role, shirtNumber) => {
-    const grp = ROLE_TO_GROUP[role] || 'MF';
-    return {
-      id: null,
-      name: `${pick(bank.firstNames)} ${pick(bank.lastNames)}`,
-      position: grp,
-      role,
-      nationality,
-      shirtNumber,
-      attrs: attrsFor(grp),
-    };
-  };
-  const slots = formSlots.map((f, i) => ({ role: f.role, x: f.x, y: f.y, player: synthPlayer(f.role, i + 1) }));
+  const slots = formSlots.map((f, i) => ({
+    role: f.role, x: f.x, y: f.y,
+    player: _makeSyntheticPlayer({ role: f.role, shirtNumber: i + 1, strength, nameBank, nationality }),
+  }));
   // Synthetic 7-man bench: 1 GK + 2 DF + 2 MF + 2 FW with strength penalty.
   const benchRoles = ['GK', 'CB', 'LB', 'CM', 'CM', 'ST', 'LW'];
-  const bench = benchRoles.map((r, i) => ({ player: synthPlayer(r, 12 + i) }));
+  const bench = benchRoles.map((r, i) => ({
+    player: _makeSyntheticPlayer({ role: r, shirtNumber: 12 + i, strength, nameBank, nationality }),
+  }));
+  return { formation, slots, bench };
+}
+
+/* Build a single synthetic player at a given strength + role. Shared by
+ * synthesizeXI and parseCustomRoster so a user-typed name slots into the
+ * same shape as a fully-random one. */
+function _makeSyntheticPlayer({ role, name, shirtNumber, strength = 60, nameBank = 'Generic English', nationality = '' }) {
+  const grp = ROLE_TO_GROUP[role] || 'MF';
+  const bank = (state && state.nameBanks && state.nameBanks[nameBank]) || DEFAULT_NAME_BANKS[nameBank] || DEFAULT_NAME_BANKS['Generic English'];
+  const attr = (mean, w = 1) => clamp(Math.round(randNorm(mean * w, 8)), 1, 99);
+  let attrs;
+  if (grp === 'GK') attrs = { pace: attr(strength, 0.6), strength: attr(strength, 0.85), technique: attr(strength, 0.55), passing: attr(strength, 0.65), defending: attr(strength, 0.5), shooting: attr(strength, 0.2), mental: attr(strength, 0.95), goalkeeping: attr(strength, 1.15) };
+  else if (grp === 'DF') attrs = { pace: attr(strength, 0.95), strength: attr(strength, 1.0), technique: attr(strength, 0.75), passing: attr(strength, 0.85), defending: attr(strength, 1.15), shooting: attr(strength, 0.4), mental: attr(strength, 0.9), goalkeeping: 5 };
+  else if (grp === 'MF') attrs = { pace: attr(strength, 0.9), strength: attr(strength, 0.85), technique: attr(strength, 1.05), passing: attr(strength, 1.1), defending: attr(strength, 0.7), shooting: attr(strength, 0.85), mental: attr(strength, 0.95), goalkeeping: 5 };
+  else attrs = { pace: attr(strength, 1.1), strength: attr(strength, 1.0), technique: attr(strength, 1.05), passing: attr(strength, 0.85), defending: attr(strength, 0.45), shooting: attr(strength, 1.15), mental: attr(strength, 0.9), goalkeeping: 5 };
+  return {
+    id: null,
+    name: name || `${pick(bank.firstNames)} ${pick(bank.lastNames)}`,
+    position: grp,
+    role,
+    nationality,
+    shirtNumber: shirtNumber || null,
+    attrs,
+  };
+}
+
+/* Parse a free-text roster into an XI + bench. Each non-empty line is
+ *   ROLE Name [#shirt] [~strength]
+ * with `#` and `~` tags accepted in any order. A line consisting of `---`
+ * (or `===`) marks the boundary between XI and bench; otherwise the first
+ * 11 lines are the XI and any extras become the bench. Missing XI slots
+ * are filled with synthesized players at the team's base strength. */
+function parseCustomRoster(text, { formation = DEFAULT_FORMATION, baseStrength = 60, nameBank = 'Generic English', nationality = '' } = {}) {
+  const formSlots = FORMATIONS[formation] || FORMATIONS[DEFAULT_FORMATION];
+  const lines = (text || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const xiLines = []; const benchLines = [];
+  let inBench = false;
+  const parseLine = line => {
+    let s = line.trim();
+    let shirt = null, strength = null;
+    const shirtMatch = s.match(/\s+#(\d{1,3})\b/);
+    if (shirtMatch) { shirt = parseInt(shirtMatch[1]); s = s.replace(shirtMatch[0], ''); }
+    const strMatch = s.match(/\s+~(\d{1,2})\b/);
+    if (strMatch) { strength = parseInt(strMatch[1]); s = s.replace(strMatch[0], ''); }
+    s = s.trim();
+    const tokens = s.split(/\s+/);
+    if (tokens.length < 2) return null;
+    const role = tokens.shift().toUpperCase();
+    const name = tokens.join(' ');
+    return { role, name, shirt, strength };
+  };
+  for (const line of lines) {
+    if (/^[-=]{2,}/.test(line)) { inBench = true; continue; }
+    const parsed = parseLine(line);
+    if (!parsed) continue;
+    if (inBench || xiLines.length >= 11) benchLines.push(parsed);
+    else xiLines.push(parsed);
+  }
+  const slots = formSlots.map((f, i) => {
+    const u = xiLines[i];
+    return {
+      role: u?.role || f.role,
+      x: f.x, y: f.y,
+      player: _makeSyntheticPlayer({
+        role: u?.role || f.role,
+        name: u?.name,
+        shirtNumber: u?.shirt || (i + 1),
+        strength: u?.strength || baseStrength,
+        nameBank, nationality,
+      }),
+    };
+  });
+  const bench = benchLines.map((b, i) => ({
+    player: _makeSyntheticPlayer({
+      role: b.role, name: b.name,
+      shirtNumber: b.shirt || (12 + i),
+      strength: b.strength || baseStrength,
+      nameBank, nationality,
+    }),
+  }));
   return { formation, slots, bench };
 }
 
