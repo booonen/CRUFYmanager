@@ -95,6 +95,7 @@ function toggleSavesDropdown(ev) {
   m.innerHTML = `
     <div class="saves-dropdown-item" onclick="closeSavesDropdown(); exportSave()">⤓ Export save (.json)</div>
     <div class="saves-dropdown-item" onclick="closeSavesDropdown(); document.getElementById('file-input').click()">⤒ Import save…</div>
+    <div class="saves-dropdown-item" onclick="closeSavesDropdown(); document.getElementById('roster-input').click()">⤒ Import roster (NT/club)…</div>
     <div class="saves-dropdown-divider"></div>
     <div class="saves-dropdown-item" onclick="closeSavesDropdown(); saveStateNow(); showToast('Save flushed','success')">💾 Save now</div>
     <div class="saves-dropdown-divider"></div>
