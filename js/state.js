@@ -288,6 +288,73 @@ function handleImport(ev) {
   reader.readAsText(file);
 }
 
+function handleRosterImport(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const roster = JSON.parse(e.target.result);
+      if (!roster || !Array.isArray(roster.players)) {
+        throw new Error('Not a roster JSON (expected { players: [...] })');
+      }
+      const teamLabel = roster.team || roster.country || 'roster';
+      const msg = `Add ${roster.players.length} player(s) from "${teamLabel}" to your save as free agents? Existing data is kept; ids are regenerated to avoid collisions.`;
+      if (!confirm(msg)) { ev.target.value = ''; return; }
+
+      const defaultBank = state.settings.defaultNameBank || 'Generic English';
+      const knownBank = name => name && (state.nameBanks[name] || DEFAULT_NAME_BANKS[name]);
+
+      let addedPlayers = 0;
+      for (const raw of roster.players) {
+        const p = deepClone(raw);
+        p.id = uid('p_');
+        p.clubId = null;
+        if (!knownBank(p.nameBankUsed)) p.nameBankUsed = defaultBank;
+        p.contract = p.contract || { wage: 0, years: 0 };
+        p.status = p.status || { injuredUntil: 0, suspendedFor: 0, yellowsThisSeason: 0, fatigue: 0 };
+        p.seasonStats = p.seasonStats || { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+        p.skillHistory = p.skillHistory || [];
+        p.isRetired = !!p.isRetired;
+        p.shirtNumber = null; // free agents don't carry a club shirt
+        if (!p.name && (p.firstName || p.lastName)) p.name = `${p.firstName || ''} ${p.lastName || ''}`.trim();
+        state.players.push(p);
+        addedPlayers++;
+      }
+
+      const stockManagerAttrs = () => ({
+        tactical: 60, manManagement: 60, youthDev: 50, reputation: 55,
+      });
+      let addedManagers = 0;
+      for (const key of ['manager', 'assistantManager']) {
+        const raw = roster[key];
+        if (!raw) continue;
+        const m = deepClone(raw);
+        m.id = uid('m_');
+        m.firstName = m.firstName || (m.name || '').split(' ')[0] || '?';
+        m.lastName = m.lastName || (m.name || '').split(' ').slice(1).join(' ') || '?';
+        m.nationality = m.nationality || roster.country || state.settings.nation?.name || '';
+        if (!knownBank(m.nameBankUsed)) m.nameBankUsed = defaultBank;
+        m.attrs = m.attrs || stockManagerAttrs();
+        m.formerPlayerId = m.formerPlayerId || null;
+        m.clubId = null;
+        m.isUnemployed = true;
+        m.seasonsAtClub = 0;
+        state.managers.push(m);
+        addedManagers++;
+      }
+
+      await saveStateNow();
+      showToast(`Imported ${addedPlayers} players, ${addedManagers} staff`, 'success');
+      refreshAll();
+    } catch (err) {
+      showToast('Roster import failed: ' + err.message, 'error');
+    }
+    ev.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
 async function resetSave() {
   if (!confirm('This wipes all data including history. Name banks (your custom name lists) will be preserved. Type-confirm in next prompt to be sure.')) return;
   const confirmation = prompt('Type RESET to wipe everything:');
