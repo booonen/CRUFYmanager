@@ -251,6 +251,84 @@ function bbcodeExternalMatchReport(m) {
   return s.trim();
 }
 
+/* ===========================================================================
+ * External match report — Simple Box mode
+ *   Single-block layout matching the NS forum-style template:
+ *     [box][align=center]<header>\n<venue>\n[hr][/hr]<events>[/align][/box]
+ *
+ *   Reads optional fields off the match if present (venue, dateStr,
+ *   homeColor, awayColor, homeShort, awayShort) so the existing schema
+ *   keeps working and form fields can be wired in later.
+ * ========================================================================= */
+function bbcodeExternalMatchReportSimple(m) {
+  if (!m) return '';
+  const homeColor = m.homeColor || BB_ACCENT;
+  const awayColor = m.awayColor || BB_DIM;
+  const shortOf = name => (name || '').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || '???';
+  const homeShort = m.homeShort || shortOf(m.homeName);
+  const awayShort = m.awayShort || shortOf(m.awayName);
+
+  const homeWon = m.hScore > m.aScore;
+  const awayWon = m.aScore > m.hScore;
+  const homePart = `[color=${homeColor}]${m.homeName} ${m.hScore}[/color]`;
+  const awayPart = `[color=${awayColor}] ${m.aScore} ${m.awayName}[/color]`;
+  const homeTxt = homeWon ? bbBold(homePart) : homePart;
+  const awayTxt = awayWon ? bbBold(awayPart) : awayPart;
+  let scoreLine = `${homeTxt} -${awayTxt}`;
+  if (m.extraTime) scoreLine += ' (a.e.t.)';
+  if (m.penalties) scoreLine += ` (${m.penalties.homeKicks}–${m.penalties.awayKicks} pens)`;
+
+  let s = '[box][align=center]';
+  s += bbSize(150, scoreLine);
+
+  const venueBits = [m.venue, m.dateStr].filter(Boolean);
+  if (venueBits.length) {
+    s += '\n' + bbSize(85, venueBits.join(' - '));
+  }
+  s += '\n[hr][/hr]';
+
+  const lines = bbcodeSimpleEventLines(m, { homeShort, awayShort });
+  if (lines.length) s += '\n' + lines.join('\n');
+
+  s += '[/align][/box]';
+  return s;
+}
+
+function bbcodeSimpleEventLines(m, { homeShort, awayShort }) {
+  const minLabel = min => min > 90 ? `90+${min - 90}'` : `${min}'`;
+  const shortFor = side => side === 'home' ? homeShort : awayShort;
+
+  const beneficiary = sc => sc.ownGoal ? (sc.ownGoalSide || (sc.side === 'home' ? 'away' : 'home')) : sc.side;
+  const ordered = (m.scorers || []).slice().sort((a, b) => a.minute - b.minute);
+  let runH = 0, runA = 0;
+  const runningByScorer = new Map();
+  for (const sc of ordered) {
+    if (beneficiary(sc) === 'home') runH++; else runA++;
+    runningByScorer.set(sc, `${runH}-${runA}`);
+  }
+
+  const items = [];
+  for (const sc of ordered) {
+    const name = sc.playerName || playerName(sc.playerId) || '?';
+    const og = sc.ownGoal ? ' (OG)' : '';
+    const pen = sc.penalty ? ' (P)' : '';
+    items.push({ minute: sc.minute, order: 0, text: `${minLabel(sc.minute)}: ${name}${og}${pen} ${runningByScorer.get(sc)}` });
+  }
+  for (const c of (m.cards || [])) {
+    const name = c.playerName || playerName(c.playerId) || '?';
+    const bg = c.type === 'red' ? '#FF0000' : '#FFFF00';
+    const marker = `[background=${bg}][color=${bg}]--[/color][/background]`;
+    items.push({ minute: c.minute, order: 1, text: `${minLabel(c.minute)}: ${marker} ${name} (${shortFor(c.side)})` });
+  }
+  for (const sub of (m.subs || [])) {
+    const off = playerName(sub.offId) || sub.offName || '?';
+    const on = playerName(sub.onId) || sub.onName || '?';
+    items.push({ minute: sub.minute, order: 2, text: `${minLabel(sub.minute)}: [color=#FF0000]${off}[/color] <> [color=#00BF00]${on}[/color] (${shortFor(sub.side)})` });
+  }
+  items.sort((a, b) => a.minute - b.minute || a.order - b.order);
+  return items.map(i => i.text);
+}
+
 function bbcodeExternalLineup(teamName, xi) {
   if (!xi || !xi.slots) return '';
   let s = `${bbBold(teamName)} (${xi.formation})\n[list]`;
