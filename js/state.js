@@ -341,6 +341,7 @@ function handleRosterImport(ev) {
       const knownBank = name => name && (state.nameBanks[name] || DEFAULT_NAME_BANKS[name]);
 
       let addedPlayers = 0;
+      const newIds = [];
       for (const raw of roster.players) {
         const p = deepClone(raw);
         p.id = uid('p_');
@@ -354,7 +355,18 @@ function handleRosterImport(ev) {
         p.shirtNumber = null; // free agents don't carry a club shirt
         if (!p.name && (p.firstName || p.lastName)) p.name = `${p.firstName || ''} ${p.lastName || ''}`.trim();
         state.players.push(p);
+        newIds.push(p.id);
         addedPlayers++;
+      }
+      // If the roster's country matches the user's nation, auto-add the
+      // imported players to the NT squad so external NT matches can pick
+      // from them (and have a bench for substitutions).
+      const rosterCountry = (roster.country || roster.team || '').trim();
+      const myNation = (state.settings.nation?.name || '').trim();
+      if (rosterCountry && myNation && rosterCountry.toLowerCase() === myNation.toLowerCase()) {
+        state.settings.ntSquad = state.settings.ntSquad || [];
+        const existing = new Set(state.settings.ntSquad);
+        for (const id of newIds) if (!existing.has(id)) state.settings.ntSquad.push(id);
       }
 
       const stockManagerAttrs = () => ({

@@ -1970,6 +1970,41 @@ function scriptedMatch({
     }
   }
 
+  // Substitutions: 1-3 per side, drawn from each side's bench at minutes 55-86.
+  // Goals/cards above were already assigned to starters; in rare cases a player
+  // could "score" after being subbed off — accepted as cosmetic since this
+  // generator doesn't simulate per-minute pitch state.
+  const subs = [];
+  for (const side of ['home', 'away']) {
+    const xi = side === 'home' ? homeXI : awayXI;
+    const benchAvail = ((xi && xi.bench) || []).map(b => b.player).filter(Boolean).slice();
+    if (!benchAvail.length) continue;
+    const onPitch = new Set(side === 'home' ? hPlayers : aPlayers);
+    const numSubs = Math.min(pickInt(1, 3), benchAvail.length);
+    const subMins = new Set();
+    let safety = 0;
+    while (subMins.size < numSubs && safety < 50) { subMins.add(pickInt(55, 86)); safety++; }
+    for (const min of Array.from(subMins).sort((a, b) => a - b)) {
+      const candidatesOff = Array.from(onPitch).filter(p => p.position !== 'GK');
+      if (!candidatesOff.length) break;
+      const off = pick(candidatesOff);
+      const sameRole = benchAvail.filter(b => b.position === off.position);
+      const on = sameRole.length ? sameRole[0] : benchAvail[0];
+      if (!on) break;
+      onPitch.delete(off);
+      benchAvail.splice(benchAvail.indexOf(on), 1);
+      subs.push({
+        side, minute: min, reason: 'tactical',
+        offId: off.id || null, offName: off.name,
+        onId: on.id || null, onName: on.name,
+      });
+      events.push({
+        minute: min, type: 'sub', side, icon: '⇄',
+        text: `${side === 'home' ? homeName : awayName} substitution: ${off.name} off, ${on.name} on.`
+      });
+    }
+  }
+
   // Half-time + full-time markers
   let hAtHT = 0, aAtHT = 0;
   for (const sc of scorers) if (sc.minute <= 45) { if (sc.side === 'home') hAtHT++; else aAtHT++; }
@@ -2025,11 +2060,37 @@ function scriptedMatch({
     hScore, aScore,
     extraTime, penalties,
     events, scorers, cards,
-    injuries: [], subs: [],
-    appearances: [
-      ...hPlayers.map(p => ({ playerId: p.id || null, playerName: p.name, side: 'home', minutesPlayed: totalMin, started: true })),
-      ...aPlayers.map(p => ({ playerId: p.id || null, playerName: p.name, side: 'away', minutesPlayed: totalMin, started: true })),
-    ],
+    injuries: [], subs,
+    appearances: (() => {
+      const out = [];
+      const buildSide = (sidePlayers, side) => {
+        const sideSubs = subs.filter(s => s.side === side);
+        const offByKey = {};
+        for (const sub of sideSubs) {
+          const k = sub.offId || `__${sub.offName}`;
+          offByKey[k] = sub.minute;
+        }
+        for (const p of sidePlayers) {
+          const k = p.id || `__${p.name}`;
+          const offMin = offByKey[k];
+          out.push({
+            playerId: p.id || null, playerName: p.name, side,
+            minutesPlayed: offMin != null ? offMin : totalMin,
+            started: true,
+          });
+        }
+        for (const sub of sideSubs) {
+          out.push({
+            playerId: sub.onId, playerName: sub.onName, side,
+            minutesPlayed: Math.max(0, totalMin - sub.minute),
+            started: false,
+          });
+        }
+      };
+      buildSide(hPlayers, 'home');
+      buildSide(aPlayers, 'away');
+      return out;
+    })(),
     stats, stoppage,
     isExternal: true,
     ts: Date.now(),
@@ -2041,28 +2102,30 @@ function scriptedMatch({
 function synthesizeXI({ formation = DEFAULT_FORMATION, strength = 60, nameBank = 'Generic English', nationality = '', teamName = 'Custom XI' }) {
   const formSlots = FORMATIONS[formation] || FORMATIONS[DEFAULT_FORMATION];
   const bank = (state && state.nameBanks && state.nameBanks[nameBank]) || DEFAULT_NAME_BANKS[nameBank] || DEFAULT_NAME_BANKS['Generic English'];
-  const slots = formSlots.map((f, i) => {
-    const grp = ROLE_TO_GROUP[f.role];
-    const attr = (mean, w = 1) => clamp(Math.round(randNorm(mean * w, 8)), 1, 99);
-    let attrs;
-    if (grp === 'GK') attrs = { pace: attr(strength, 0.6), strength: attr(strength, 0.85), technique: attr(strength, 0.55), passing: attr(strength, 0.65), defending: attr(strength, 0.5), shooting: attr(strength, 0.2), mental: attr(strength, 0.95), goalkeeping: attr(strength, 1.15) };
-    else if (grp === 'DF') attrs = { pace: attr(strength, 0.95), strength: attr(strength, 1.0), technique: attr(strength, 0.75), passing: attr(strength, 0.85), defending: attr(strength, 1.15), shooting: attr(strength, 0.4), mental: attr(strength, 0.9), goalkeeping: 5 };
-    else if (grp === 'MF') attrs = { pace: attr(strength, 0.9), strength: attr(strength, 0.85), technique: attr(strength, 1.05), passing: attr(strength, 1.1), defending: attr(strength, 0.7), shooting: attr(strength, 0.85), mental: attr(strength, 0.95), goalkeeping: 5 };
-    else attrs = { pace: attr(strength, 1.1), strength: attr(strength, 1.0), technique: attr(strength, 1.05), passing: attr(strength, 0.85), defending: attr(strength, 0.45), shooting: attr(strength, 1.15), mental: attr(strength, 0.9), goalkeeping: 5 };
+  const attr = (mean, w = 1) => clamp(Math.round(randNorm(mean * w, 8)), 1, 99);
+  const attrsFor = grp => {
+    if (grp === 'GK') return { pace: attr(strength, 0.6), strength: attr(strength, 0.85), technique: attr(strength, 0.55), passing: attr(strength, 0.65), defending: attr(strength, 0.5), shooting: attr(strength, 0.2), mental: attr(strength, 0.95), goalkeeping: attr(strength, 1.15) };
+    if (grp === 'DF') return { pace: attr(strength, 0.95), strength: attr(strength, 1.0), technique: attr(strength, 0.75), passing: attr(strength, 0.85), defending: attr(strength, 1.15), shooting: attr(strength, 0.4), mental: attr(strength, 0.9), goalkeeping: 5 };
+    if (grp === 'MF') return { pace: attr(strength, 0.9), strength: attr(strength, 0.85), technique: attr(strength, 1.05), passing: attr(strength, 1.1), defending: attr(strength, 0.7), shooting: attr(strength, 0.85), mental: attr(strength, 0.95), goalkeeping: 5 };
+    return { pace: attr(strength, 1.1), strength: attr(strength, 1.0), technique: attr(strength, 1.05), passing: attr(strength, 0.85), defending: attr(strength, 0.45), shooting: attr(strength, 1.15), mental: attr(strength, 0.9), goalkeeping: 5 };
+  };
+  const synthPlayer = (role, shirtNumber) => {
+    const grp = ROLE_TO_GROUP[role] || 'MF';
     return {
-      role: f.role, x: f.x, y: f.y,
-      player: {
-        id: null,
-        name: `${pick(bank.firstNames)} ${pick(bank.lastNames)}`,
-        position: grp,
-        role: f.role,
-        nationality,
-        shirtNumber: i + 1,
-        attrs,
-      }
+      id: null,
+      name: `${pick(bank.firstNames)} ${pick(bank.lastNames)}`,
+      position: grp,
+      role,
+      nationality,
+      shirtNumber,
+      attrs: attrsFor(grp),
     };
-  });
-  return { formation, slots };
+  };
+  const slots = formSlots.map((f, i) => ({ role: f.role, x: f.x, y: f.y, player: synthPlayer(f.role, i + 1) }));
+  // Synthetic 7-man bench: 1 GK + 2 DF + 2 MF + 2 FW with strength penalty.
+  const benchRoles = ['GK', 'CB', 'LB', 'CM', 'CM', 'ST', 'LW'];
+  const bench = benchRoles.map((r, i) => ({ player: synthPlayer(r, 12 + i) }));
+  return { formation, slots, bench };
 }
 
 /* Auto-pick best XI from a candidate pool of player IDs, given a formation. */
@@ -2092,7 +2155,13 @@ function autoPickXIFromPool(playerIds, formation = DEFAULT_FORMATION) {
     }
     if (best) { slot.player = best; used.add(best.id); }
   }
-  return { formation, slots };
+  // Bench: best 7 of the remaining pool by overall, capped at the pool size.
+  const bench = pool
+    .filter(p => !used.has(p.id))
+    .sort((a, b) => playerOverall(b) - playerOverall(a))
+    .slice(0, 7)
+    .map(p => ({ player: p }));
+  return { formation, slots, bench };
 }
 
 /* ===========================================================================
