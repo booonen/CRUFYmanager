@@ -885,6 +885,8 @@ function saveExternalDraft() {
   if (!draft) return;
   state.externalMatches = state.externalMatches || [];
   state.externalMatches.push(draft);
+  // Light-touch stat side-effects: apps/goals/assists only, no ban/injury/fatigue.
+  applyExternalMatchStats(draft);
   // Also append to history book so it surfaces in player ledgers
   historyAppend('external_match', {
     matchId: draft.id,

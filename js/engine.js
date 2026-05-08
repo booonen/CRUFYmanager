@@ -225,6 +225,72 @@ function generateManager({ nationality, nameBank, attrs, formerPlayerId } = {}) 
 }
 
 /* ===========================================================================
+ * External match stat side-effects (light-touch)
+ *
+ *   External matches (NT friendlies, continental ties, etc.) are not part of
+ *   league competition. We log apps / goals / assists onto each known
+ *   player's seasonStats so player detail reflects what happened, but we
+ *   deliberately skip yellow accumulation toward bans, suspensions, injury
+ *   accrual, and fatigue — those are league-bound mechanics and would
+ *   otherwise leak across competitions.
+ *
+ *   `statsApplied` on the match record is the idempotency flag.
+ * ========================================================================= */
+function applyExternalMatchStats(m) {
+  if (!m || m.statsApplied) return;
+  // seasonStats is per-season and is wiped at rollover. Only bump the live
+  // counter when the match is from the current season.
+  if (m.season !== state.settings.season) { m.statsApplied = true; return; }
+  for (const ap of m.appearances || []) {
+    if (!ap.playerId) continue;
+    const p = getPlayer(ap.playerId);
+    if (!p) continue;
+    p.seasonStats = p.seasonStats || { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+    p.seasonStats.apps = (p.seasonStats.apps || 0) + 1;
+  }
+  for (const sc of m.scorers || []) {
+    if (sc.playerId && !sc.ownGoal) {
+      const p = getPlayer(sc.playerId);
+      if (p) {
+        p.seasonStats = p.seasonStats || { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+        p.seasonStats.goals = (p.seasonStats.goals || 0) + 1;
+      }
+    }
+    if (sc.assistId) {
+      const a = getPlayer(sc.assistId);
+      if (a) {
+        a.seasonStats = a.seasonStats || { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+        a.seasonStats.assists = (a.seasonStats.assists || 0) + 1;
+      }
+    }
+  }
+  m.statsApplied = true;
+}
+
+function revertExternalMatchStats(m) {
+  if (!m || !m.statsApplied) return;
+  // Past-season matches have already had their counters wiped at rollover —
+  // just clear the flag without touching the current season's stats.
+  if (m.season !== state.settings.season) { m.statsApplied = false; return; }
+  for (const ap of m.appearances || []) {
+    if (!ap.playerId) continue;
+    const p = getPlayer(ap.playerId);
+    if (p && p.seasonStats) p.seasonStats.apps = Math.max(0, (p.seasonStats.apps || 0) - 1);
+  }
+  for (const sc of m.scorers || []) {
+    if (sc.playerId && !sc.ownGoal) {
+      const p = getPlayer(sc.playerId);
+      if (p && p.seasonStats) p.seasonStats.goals = Math.max(0, (p.seasonStats.goals || 0) - 1);
+    }
+    if (sc.assistId) {
+      const a = getPlayer(sc.assistId);
+      if (a && a.seasonStats) a.seasonStats.assists = Math.max(0, (a.seasonStats.assists || 0) - 1);
+    }
+  }
+  m.statsApplied = false;
+}
+
+/* ===========================================================================
  * Schedule generation: double round-robin (each pair plays home + away)
  * ========================================================================= */
 function generateLeagueSchedule(leagueId) {

@@ -403,18 +403,34 @@ function renderExternal() {
       let pen = '';
       if (m.penalties) pen = `<span class="pen-detail">${m.penalties.homeKicks}–${m.penalties.awayKicks} pens</span>`;
       else if (m.extraTime) pen = `<span class="pen-detail">a.e.t.</span>`;
-      html += `<div class="scoreline scoreline-committed" onclick="viewMatchModal('${m.id}')" style="cursor:pointer">
+      html += `<div class="scoreline scoreline-committed" onclick="viewMatchModal('${m.id}')" style="cursor:pointer;position:relative">
         <div class="home-team">${esc(m.homeName)}<div class="text-muted" style="font-size:11px">${esc(subtitle)}</div></div>
         <div class="score">${m.hScore}–${m.aScore}${pen}</div>
         <div class="away-team">${esc(m.awayName)}</div>
+        <button onclick="event.stopPropagation(); strikeExternalAsk('${m.id}')" title="Strike from records" style="position:absolute;top:6px;right:8px;font-size:13px;line-height:1;color:var(--danger);background:transparent;border:none;cursor:pointer;padding:2px 6px">✕</button>
       </div>`;
     }
   }
   root.innerHTML = html;
 }
 
+function strikeExternalAsk(id) {
+  const m = (state.externalMatches || []).find(x => x.id === id);
+  if (!m) return false;
+  const label = `${m.homeName} ${m.hScore}–${m.aScore} ${m.awayName}`;
+  if (!confirm(`Strike "${label}" from records? This rolls back apps/goals/assists and removes it from player ledgers.`)) return false;
+  deleteExternal(id);
+  showToast('External match struck', 'success');
+  return true;
+}
+
 function deleteExternal(id) {
-  state.externalMatches = (state.externalMatches || []).filter(m => m.id !== id);
+  const m = (state.externalMatches || []).find(x => x.id === id);
+  if (m) revertExternalMatchStats(m);
+  // Strike the history stub so player ledgers stop showing it.
+  const stub = state.history.find(e => e.type === 'external_match' && e.matchId === id);
+  if (stub) strikeRecord(stub.id, 'external match struck');
+  state.externalMatches = (state.externalMatches || []).filter(x => x.id !== id);
   saveState(); refreshAll();
 }
 

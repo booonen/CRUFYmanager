@@ -210,6 +210,41 @@ function migrateState(parsed) {
   } else if (!fresh.calendar) {
     fresh.calendar = { season: fresh.settings?.season || 1, day: 1, totalDays: 38 };
   }
+  // One-time backfill: apply seasonStats deltas to any external matches that
+  // pre-date the apps/goals/assists logging. Idempotent via statsApplied flag.
+  if (Array.isArray(fresh.externalMatches) && Array.isArray(fresh.players)) {
+    const byId = new Map(fresh.players.map(p => [p.id, p]));
+    const currentSeason = fresh.settings?.season;
+    let backfilled = 0;
+    const ensureStats = p => p.seasonStats = p.seasonStats || { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+    for (const m of fresh.externalMatches) {
+      if (m.statsApplied) continue;
+      // Past-season matches: counters were wiped at rollover. Mark as
+      // applied so future strikes won't try to roll them back from this
+      // season's tallies.
+      if (m.season !== currentSeason) { m.statsApplied = true; backfilled++; continue; }
+      for (const ap of m.appearances || []) {
+        if (!ap.playerId) continue;
+        const p = byId.get(ap.playerId);
+        if (!p) continue;
+        ensureStats(p);
+        p.seasonStats.apps = (p.seasonStats.apps || 0) + 1;
+      }
+      for (const sc of m.scorers || []) {
+        if (sc.playerId && !sc.ownGoal) {
+          const p = byId.get(sc.playerId);
+          if (p) { ensureStats(p); p.seasonStats.goals = (p.seasonStats.goals || 0) + 1; }
+        }
+        if (sc.assistId) {
+          const a = byId.get(sc.assistId);
+          if (a) { ensureStats(a); a.seasonStats.assists = (a.seasonStats.assists || 0) + 1; }
+        }
+      }
+      m.statsApplied = true;
+      backfilled++;
+    }
+    if (backfilled) console.log(`Backfilled seasonStats for ${backfilled} external match(es).`);
+  }
   return fresh;
 }
 

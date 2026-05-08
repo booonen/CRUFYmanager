@@ -335,7 +335,7 @@ function viewMatchModal(matchOrEventId, opts = {}) {
     footer = `
       <button class="btn" onclick="copyToClipboard(bbcodeExternalMatchReport(state.externalMatches.find(e=>e.id==='${m.id}')))">Copy BBCode</button>
       <button class="btn" onclick="copyToClipboard(bbcodeExternalMatchReportSimple(state.externalMatches.find(e=>e.id==='${m.id}')))">Copy BBCode (Simple Box)</button>
-      <button class="btn btn-danger" onclick="if(confirm('Delete this external match?')) { deleteExternal('${m.id}'); closeModal(); }">Delete</button>
+      <button class="btn btn-danger" onclick="if (strikeExternalAsk('${m.id}')) closeModal();">Strike from records</button>
       <button class="btn" onclick="closeModal()">Close</button>
     `;
   } else {
