@@ -713,7 +713,10 @@ function renderExSideHTML(side) {
         <textarea id="ex-${side}-roster" rows="8" style="width:100%;font-family:var(--font-mono);font-size:12px" placeholder="${esc(rosterPlaceholder)}">${esc(s.customRoster || '')}</textarea>
         <div class="form-hint">Optional. One player per line: <code>ROLE Name #shirt ~strength</code>. Use <code>---</code> to mark the bench. Empty = randomise.</div>
       </div>
-      <button class="btn btn-sm" onclick="exSideRegenerateCustom('${side}')">↻ Regenerate XI</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="exSideRegenerateCustom('${side}')" title="Re-roll attributes; keep typed names">↻ Re-roll stats</button>
+        <button class="btn btn-sm" onclick="exSideRandomizeNames('${side}')" title="Wipe typed roster and randomise names from the name bank">🎲 Random names</button>
+      </div>
     `;
   }
 
@@ -755,6 +758,13 @@ function exSideChanged(side, field, value) {
 
 function exSideRegenerateCustom(side) {
   captureExFormState();
+  refreshExSideXI(side);
+  renderExternalModal();
+}
+
+function exSideRandomizeNames(side) {
+  captureExFormState();
+  _exDraftState[side].customRoster = '';
   refreshExSideXI(side);
   renderExternalModal();
 }

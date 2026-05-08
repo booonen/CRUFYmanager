@@ -198,14 +198,15 @@
 <input type="file" id="file-input" accept=".json" style="display:none" onchange="handleImport(event)">
 <input type="file" id="roster-input" accept=".json" style="display:none" onchange="handleRosterImport(event)">
 
-<script src="js/data.js"></script>
-<script src="js/state.js"></script>
-<script src="js/engine.js"></script>
-<script src="js/export.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/views.js"></script>
-<script src="js/views2.js"></script>
-<script src="js/forms.js"></script>
+<!-- Bump ?v= on every JS change so browsers don't serve a stale cached copy. -->
+<script src="js/data.js?v=20260508a"></script>
+<script src="js/state.js?v=20260508a"></script>
+<script src="js/engine.js?v=20260508a"></script>
+<script src="js/export.js?v=20260508a"></script>
+<script src="js/ui.js?v=20260508a"></script>
+<script src="js/views.js?v=20260508a"></script>
+<script src="js/views2.js?v=20260508a"></script>
+<script src="js/forms.js?v=20260508a"></script>
 <script>
 (async () => {
   await loadState();
