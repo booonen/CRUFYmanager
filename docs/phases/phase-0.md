@@ -1,5 +1,8 @@
 # Phase 0 Design Proposal — Scaffold & Schema
 
+> **Status:** shipped. Phase 0 acceptance gate met on 2026-05-09. Merged to `main` via PR #4.
+> Post-ship polish (header layout, dashboard route, modal rename/delete, BrowserRouter) included in the same PR.
+
 Companion to `CRUFY_PLAN_1.md`. This is the per-phase design proposal the plan requires before any implementation. It restates Phase 0 goals, lists the concrete decisions I plan to make, flags every place I'm overriding/extending the plan, and ends with an open-question round for sign-off.
 
 ---
