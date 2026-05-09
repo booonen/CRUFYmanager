@@ -210,6 +210,41 @@ function migrateState(parsed) {
   } else if (!fresh.calendar) {
     fresh.calendar = { season: fresh.settings?.season || 1, day: 1, totalDays: 38 };
   }
+  // One-time backfill: apply seasonStats deltas to any external matches that
+  // pre-date the apps/goals/assists logging. Idempotent via statsApplied flag.
+  if (Array.isArray(fresh.externalMatches) && Array.isArray(fresh.players)) {
+    const byId = new Map(fresh.players.map(p => [p.id, p]));
+    const currentSeason = fresh.settings?.season;
+    let backfilled = 0;
+    const ensureStats = p => p.seasonStats = p.seasonStats || { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+    for (const m of fresh.externalMatches) {
+      if (m.statsApplied) continue;
+      // Past-season matches: counters were wiped at rollover. Mark as
+      // applied so future strikes won't try to roll them back from this
+      // season's tallies.
+      if (m.season !== currentSeason) { m.statsApplied = true; backfilled++; continue; }
+      for (const ap of m.appearances || []) {
+        if (!ap.playerId) continue;
+        const p = byId.get(ap.playerId);
+        if (!p) continue;
+        ensureStats(p);
+        p.seasonStats.apps = (p.seasonStats.apps || 0) + 1;
+      }
+      for (const sc of m.scorers || []) {
+        if (sc.playerId && !sc.ownGoal) {
+          const p = byId.get(sc.playerId);
+          if (p) { ensureStats(p); p.seasonStats.goals = (p.seasonStats.goals || 0) + 1; }
+        }
+        if (sc.assistId) {
+          const a = byId.get(sc.assistId);
+          if (a) { ensureStats(a); a.seasonStats.assists = (a.seasonStats.assists || 0) + 1; }
+        }
+      }
+      m.statsApplied = true;
+      backfilled++;
+    }
+    if (backfilled) console.log(`Backfilled seasonStats for ${backfilled} external match(es).`);
+  }
   return fresh;
 }
 
@@ -306,6 +341,7 @@ function handleRosterImport(ev) {
       const knownBank = name => name && (state.nameBanks[name] || DEFAULT_NAME_BANKS[name]);
 
       let addedPlayers = 0;
+      const newIds = [];
       for (const raw of roster.players) {
         const p = deepClone(raw);
         p.id = uid('p_');
@@ -319,7 +355,18 @@ function handleRosterImport(ev) {
         p.shirtNumber = null; // free agents don't carry a club shirt
         if (!p.name && (p.firstName || p.lastName)) p.name = `${p.firstName || ''} ${p.lastName || ''}`.trim();
         state.players.push(p);
+        newIds.push(p.id);
         addedPlayers++;
+      }
+      // If the roster's country matches the user's nation, auto-add the
+      // imported players to the NT squad so external NT matches can pick
+      // from them (and have a bench for substitutions).
+      const rosterCountry = (roster.country || roster.team || '').trim();
+      const myNation = (state.settings.nation?.name || '').trim();
+      if (rosterCountry && myNation && rosterCountry.toLowerCase() === myNation.toLowerCase()) {
+        state.settings.ntSquad = state.settings.ntSquad || [];
+        const existing = new Set(state.settings.ntSquad);
+        for (const id of newIds) if (!existing.has(id)) state.settings.ntSquad.push(id);
       }
 
       const stockManagerAttrs = () => ({
@@ -344,8 +391,13 @@ function handleRosterImport(ev) {
         addedManagers++;
       }
 
+      // After a re-import, history records still reference the OLD player
+      // ids. Relink any orphan ids to the freshly-imported players by name
+      // and rebuild seasonStats so career / squad views populate.
+      const relinked = relinkOrphanPlayerIds();
       await saveStateNow();
-      showToast(`Imported ${addedPlayers} players, ${addedManagers} staff`, 'success');
+      const linkMsg = relinked ? `, re-linked ${relinked} historic record(s)` : '';
+      showToast(`Imported ${addedPlayers} players, ${addedManagers} staff${linkMsg}`, 'success');
       refreshAll();
     } catch (err) {
       showToast('Roster import failed: ' + err.message, 'error');
@@ -447,11 +499,12 @@ function historyForClub(clubId) {
 }
 
 function historyForPlayer(playerId) {
+  const { matchAppearance, matchScorer } = playerMatchHelpers(playerId);
   return state.history.filter(e => {
     if (e.struck) return false;
     if ((e.type === 'match_committed' || e.type === 'external_match') && (
-        (e.appearances || []).some(a => a.playerId === playerId) ||
-        (e.scorers || []).some(s => s.playerId === playerId))) return true;
+        (e.appearances || []).some(matchAppearance) ||
+        (e.scorers || []).some(matchScorer))) return true;
     if (e.type === 'player_retired' && e.playerId === playerId) return true;
     if (e.type === 'player_to_manager' && e.playerId === playerId) return true;
     if (e.type === 'player_signed' && e.playerId === playerId) return true;
@@ -470,6 +523,84 @@ function historyForManager(managerId) {
     if (e.type === 'player_to_manager' && e.managerId === managerId) return true;
     return false;
   });
+}
+
+/* Walk history and rewrite any orphan playerId on appearances / scorers /
+ * assists / cards to the current player whose name matches uniquely. After
+ * the remap, rebuild every active player's seasonStats counters from the
+ * current season's matches so squad lists and season cards reflect the
+ * relinked records too. Returns { relinked, statsRebuilt }.
+ *
+ * Call this after a roster re-import that gave players fresh ids. The
+ * playerCareerStats orphan-fallback already covers display-time matching;
+ * this is the one-shot data fix that also restores seasonStats. */
+function relinkOrphanPlayerIds() {
+  const byName = new Map();
+  for (const p of state.players) {
+    const k = (p.name || `${p.firstName || ''} ${p.lastName || ''}`.trim()).trim();
+    if (!k) continue;
+    if (!byName.has(k)) byName.set(k, []);
+    byName.get(k).push(p);
+  }
+  const knownIds = new Set(state.players.map(p => p.id));
+  let relinked = 0;
+  const remap = (rec, idField, nameField) => {
+    if (rec[idField] && knownIds.has(rec[idField])) return;
+    const name = (rec[nameField] || '').trim();
+    if (!name) return;
+    const cands = byName.get(name) || [];
+    if (cands.length !== 1) return; // skip ambiguous and not-found
+    rec[idField] = cands[0].id;
+    relinked++;
+  };
+  for (const e of state.history) {
+    if (e.type !== 'match_committed' && e.type !== 'external_match') continue;
+    for (const ap of e.appearances || []) remap(ap, 'playerId', 'playerName');
+    for (const sc of e.scorers || []) {
+      remap(sc, 'playerId', 'playerName');
+      if (sc.assistName) remap(sc, 'assistId', 'assistName');
+    }
+    for (const c of e.cards || []) remap(c, 'playerId', 'playerName');
+  }
+
+  // Rebuild current-season seasonStats from the (now-relinked) history.
+  for (const p of state.players) {
+    p.seasonStats = { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+  }
+  const currentSeason = state.settings.season;
+  for (const e of state.history) {
+    if (e.struck || e.season !== currentSeason) continue;
+    if (e.type !== 'match_committed' && e.type !== 'external_match') continue;
+    for (const ap of e.appearances || []) {
+      if (!ap.playerId) continue;
+      const p = getPlayer(ap.playerId);
+      if (p) p.seasonStats.apps = (p.seasonStats.apps || 0) + 1;
+    }
+    for (const sc of e.scorers || []) {
+      if (sc.playerId && !sc.ownGoal) {
+        const p = getPlayer(sc.playerId);
+        if (p) p.seasonStats.goals = (p.seasonStats.goals || 0) + 1;
+      }
+      if (sc.assistId) {
+        const a = getPlayer(sc.assistId);
+        if (a) a.seasonStats.assists = (a.seasonStats.assists || 0) + 1;
+      }
+    }
+    for (const c of e.cards || []) {
+      if (!c.playerId) continue;
+      const p = getPlayer(c.playerId);
+      if (!p) continue;
+      if (c.type === 'yellow') p.seasonStats.yellows = (p.seasonStats.yellows || 0) + 1;
+      else if (c.type === 'red') p.seasonStats.reds = (p.seasonStats.reds || 0) + 1;
+    }
+  }
+  // Mark current-season external matches as having had stats applied so a
+  // future strike can roll back correctly.
+  for (const m of (state.externalMatches || [])) {
+    if (m.season === currentSeason) m.statsApplied = true;
+  }
+  saveState();
+  return relinked;
 }
 
 function strikeRecord(eventId, reason) {
@@ -498,19 +629,57 @@ function unstrikeRecord(eventId) {
  *
  *   Returns { apps, goals, assists, yellows, reds, motm, byClub: { clubId: {...} }, bySeason: { season: {...} } }
  * ========================================================================= */
+/* Predicates that match a player against the appearance / scorer / card
+ * records in a match. Re-imported rosters get fresh ids while old external
+ * matches still reference the old ones; we treat any record whose id isn't
+ * in state.players as "orphan" and fall back to a name match for it. This
+ * credits the re-imported player without double-crediting any active
+ * player who happens to share the name. */
+function playerMatchHelpers(playerId) {
+  const me = getPlayer(playerId);
+  const myName = me?.name || (me ? `${me.firstName || ''} ${me.lastName || ''}`.trim() : '');
+  const knownIds = new Set(state.players.map(p => p.id));
+  const isOrphan = id => !id || !knownIds.has(id);
+  return {
+    matchAppearance: a => a.playerId === playerId || (myName && a.playerName === myName && isOrphan(a.playerId)),
+    matchScorer:    s => s.playerId === playerId || (myName && s.playerName === myName && isOrphan(s.playerId)),
+    matchAssister:  s => s.assistId === playerId || (myName && s.assistName === myName && isOrphan(s.assistId)),
+    matchCard:      c => c.playerId === playerId || (myName && c.playerName === myName && isOrphan(c.playerId)),
+  };
+}
+
 function playerCareerStats(playerId) {
-  const out = { apps: 0, mins: 0, goals: 0, assists: 0, yellows: 0, reds: 0, byClub: {}, bySeason: {} };
-  const matches = state.history.filter(e => e.type === 'match_committed' && !e.struck);
+  const out = {
+    apps: 0, mins: 0, goals: 0, assists: 0, yellows: 0, reds: 0,
+    byClub: {}, bySeason: {},
+    international: { apps: 0, mins: 0, goals: 0, assists: 0, yellows: 0, reds: 0 },
+  };
+  const { matchAppearance, matchScorer, matchAssister, matchCard } = playerMatchHelpers(playerId);
+
+  const matches = state.history.filter(e =>
+    !e.struck && (e.type === 'match_committed' || e.type === 'external_match')
+  );
   for (const m of matches) {
-    const apps = (m.appearances || []).filter(a => a.playerId === playerId);
+    const apps = (m.appearances || []).filter(matchAppearance);
     if (!apps.length) continue;
+    const ourGoals = (m.scorers || []).filter(s => matchScorer(s) && !s.ownGoal).length;
+    const ourAssists = (m.scorers || []).filter(matchAssister).length;
+    const ourYellows = (m.cards || []).filter(c => matchCard(c) && c.type === 'yellow').length;
+    const ourReds = (m.cards || []).filter(c => matchCard(c) && c.type === 'red').length;
+    const ourMins = apps.reduce((acc, a) => acc + (a.minutesPlayed || 0), 0);
+
+    if (m.type === 'external_match') {
+      out.international.apps += 1;
+      out.international.mins += ourMins;
+      out.international.goals += ourGoals;
+      out.international.assists += ourAssists;
+      out.international.yellows += ourYellows;
+      out.international.reds += ourReds;
+      continue;
+    }
+
     const ourSide = apps[0].side;
     const ourClubId = ourSide === 'home' ? m.homeId : m.awayId;
-    const ourGoals = (m.scorers || []).filter(s => s.playerId === playerId && !s.ownGoal).length;
-    const ourAssists = (m.scorers || []).filter(s => s.assistId === playerId).length;
-    const ourYellows = (m.cards || []).filter(c => c.playerId === playerId && c.type === 'yellow').length;
-    const ourReds = (m.cards || []).filter(c => c.playerId === playerId && c.type === 'red').length;
-    const ourMins = apps.reduce((acc, a) => acc + (a.minutesPlayed || 0), 0);
     out.apps += 1;
     out.mins += ourMins;
     out.goals += ourGoals;

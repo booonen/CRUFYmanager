@@ -225,6 +225,72 @@ function generateManager({ nationality, nameBank, attrs, formerPlayerId } = {}) 
 }
 
 /* ===========================================================================
+ * External match stat side-effects (light-touch)
+ *
+ *   External matches (NT friendlies, continental ties, etc.) are not part of
+ *   league competition. We log apps / goals / assists onto each known
+ *   player's seasonStats so player detail reflects what happened, but we
+ *   deliberately skip yellow accumulation toward bans, suspensions, injury
+ *   accrual, and fatigue — those are league-bound mechanics and would
+ *   otherwise leak across competitions.
+ *
+ *   `statsApplied` on the match record is the idempotency flag.
+ * ========================================================================= */
+function applyExternalMatchStats(m) {
+  if (!m || m.statsApplied) return;
+  // seasonStats is per-season and is wiped at rollover. Only bump the live
+  // counter when the match is from the current season.
+  if (m.season !== state.settings.season) { m.statsApplied = true; return; }
+  for (const ap of m.appearances || []) {
+    if (!ap.playerId) continue;
+    const p = getPlayer(ap.playerId);
+    if (!p) continue;
+    p.seasonStats = p.seasonStats || { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+    p.seasonStats.apps = (p.seasonStats.apps || 0) + 1;
+  }
+  for (const sc of m.scorers || []) {
+    if (sc.playerId && !sc.ownGoal) {
+      const p = getPlayer(sc.playerId);
+      if (p) {
+        p.seasonStats = p.seasonStats || { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+        p.seasonStats.goals = (p.seasonStats.goals || 0) + 1;
+      }
+    }
+    if (sc.assistId) {
+      const a = getPlayer(sc.assistId);
+      if (a) {
+        a.seasonStats = a.seasonStats || { apps: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+        a.seasonStats.assists = (a.seasonStats.assists || 0) + 1;
+      }
+    }
+  }
+  m.statsApplied = true;
+}
+
+function revertExternalMatchStats(m) {
+  if (!m || !m.statsApplied) return;
+  // Past-season matches have already had their counters wiped at rollover —
+  // just clear the flag without touching the current season's stats.
+  if (m.season !== state.settings.season) { m.statsApplied = false; return; }
+  for (const ap of m.appearances || []) {
+    if (!ap.playerId) continue;
+    const p = getPlayer(ap.playerId);
+    if (p && p.seasonStats) p.seasonStats.apps = Math.max(0, (p.seasonStats.apps || 0) - 1);
+  }
+  for (const sc of m.scorers || []) {
+    if (sc.playerId && !sc.ownGoal) {
+      const p = getPlayer(sc.playerId);
+      if (p && p.seasonStats) p.seasonStats.goals = Math.max(0, (p.seasonStats.goals || 0) - 1);
+    }
+    if (sc.assistId) {
+      const a = getPlayer(sc.assistId);
+      if (a && a.seasonStats) a.seasonStats.assists = Math.max(0, (a.seasonStats.assists || 0) - 1);
+    }
+  }
+  m.statsApplied = false;
+}
+
+/* ===========================================================================
  * Schedule generation: double round-robin (each pair plays home + away)
  * ========================================================================= */
 function generateLeagueSchedule(leagueId) {
@@ -1816,14 +1882,68 @@ function scriptedMatch({
   const events = [];
   events.push({ minute: 0, type: 'kickoff', icon: '', text: templ(pick(COMMENTARY.kickoff), { hometeam: homeName, awayteam: awayName, stadium: 'a neutral venue', attendance: pickInt(15000, 80000).toLocaleString() }) });
 
-  // Pick goal-scorers and minutes
-  const scorers = [];
   const hPlayers = (homeXI?.slots || []).map(s => s.player).filter(Boolean);
   const aPlayers = (awayXI?.slots || []).map(s => s.player).filter(Boolean);
   if (!hPlayers.length || !aPlayers.length) {
     showToast('Both XIs need at least one player', 'error');
     return null;
   }
+
+  // Substitutions FIRST so subsequent picks (scorers, foulers, assisters)
+  // can be gated on who is actually on the pitch at any given minute.
+  // 1-3 per side at minutes 55-86, drawn from each side's bench, preferring
+  // same-position swaps. Subs-on are tracked separately so they become
+  // eligible to score / commit fouls only from the moment they enter.
+  const subs = [];
+  const sideOnEntries = { home: [], away: [] }; // [{minute, player}]
+  for (const side of ['home', 'away']) {
+    const xi = side === 'home' ? homeXI : awayXI;
+    const benchAvail = ((xi && xi.bench) || []).map(b => b.player).filter(Boolean).slice();
+    if (!benchAvail.length) continue;
+    const onPitch = new Set(side === 'home' ? hPlayers : aPlayers);
+    // External matches: each side always uses all three substitutions when
+    // there's bench depth. Capped only by the bench size.
+    const numSubs = Math.min(3, benchAvail.length);
+    const subMins = new Set();
+    let safety = 0;
+    while (subMins.size < numSubs && safety < 50) { subMins.add(pickInt(55, 86)); safety++; }
+    for (const min of Array.from(subMins).sort((a, b) => a - b)) {
+      const candidatesOff = Array.from(onPitch).filter(p => p.position !== 'GK');
+      if (!candidatesOff.length) break;
+      const off = pick(candidatesOff);
+      const sameRole = benchAvail.filter(b => b.position === off.position);
+      const on = sameRole.length ? sameRole[0] : benchAvail[0];
+      if (!on) break;
+      onPitch.delete(off);
+      onPitch.add(on);
+      benchAvail.splice(benchAvail.indexOf(on), 1);
+      sideOnEntries[side].push({ minute: min, player: on });
+      subs.push({
+        side, minute: min, reason: 'tactical',
+        offId: off.id || null, offName: off.name,
+        onId: on.id || null, onName: on.name,
+      });
+      events.push({
+        minute: min, type: 'sub', side, icon: '⇄',
+        text: `${side === 'home' ? homeName : awayName} substitution: ${off.name} off, ${on.name} on.`
+      });
+    }
+  }
+
+  // Pool of players on pitch for `side` at `minute`: starters minus those
+  // subbed off at or before the minute, plus subs-on who entered at or
+  // before the minute.
+  const playerKey = p => p.id || `__${p.name}`;
+  const availablePlayersAt = (side, minute) => {
+    const starters = side === 'home' ? hPlayers : aPlayers;
+    const sideSubs = subs.filter(s => s.side === side && s.minute <= minute);
+    const offKeys = new Set(sideSubs.map(s => s.offId || `__${s.offName}`));
+    const onPlayers = sideOnEntries[side].filter(e => e.minute <= minute).map(e => e.player);
+    return starters.filter(p => !offKeys.has(playerKey(p))).concat(onPlayers);
+  };
+
+  // Pick goal-scorers and minutes
+  const scorers = [];
   const goalEvents = [];
   for (let i = 0; i < hScore; i++) goalEvents.push({ side: 'home' });
   for (let i = 0; i < aScore; i++) goalEvents.push({ side: 'away' });
@@ -1842,14 +1962,15 @@ function scriptedMatch({
 
   let runH = 0, runA = 0;
   for (const g of goalEvents) {
-    const xi = g.side === 'home' ? hPlayers : aPlayers;
-    const weights = xi.map(p => Math.max((p.attrs?.shooting || 50) + (p.position === 'FW' ? 35 : p.position === 'MF' ? 12 : 0), 1));
-    const scorer = weightedPick(xi, weights) || xi[0];
+    const pool = availablePlayersAt(g.side, g.minute);
+    if (!pool.length) continue;
+    const weights = pool.map(p => Math.max((p.attrs?.shooting || 50) + (p.position === 'FW' ? 35 : p.position === 'MF' ? 12 : 0), 1));
+    const scorer = weightedPick(pool, weights) || pool[0];
     const isPenalty = rand() < 0.10;
     const isOG = !isPenalty && rand() < 0.03;
     let assister = null;
     if (!isPenalty && !isOG && rand() < 0.7) {
-      const others = xi.filter(p => p !== scorer);
+      const others = pool.filter(p => p !== scorer);
       if (others.length) {
         const aw = others.map(p => Math.max((p.attrs?.passing || 50) + (p.attrs?.technique || 50), 1));
         assister = weightedPick(others, aw);
@@ -1875,30 +1996,29 @@ function scriptedMatch({
     events.push({ minute: g.minute, type: isPenalty ? 'penalty' : 'goal', side: g.side, icon: '⚽', score: `${runH}–${runA}`, text });
   }
 
-  // Cards: 2-5 yellows + occasional red
+  // Cards: 2-5 yellows + occasional red. Foulers must be on the pitch at the
+  // card minute (so a subbed-off player can't pick up a card).
   const cards = [];
   const numCards = pickInt(2, 5);
   const cardMins = new Set();
   for (let i = 0; i < numCards; i++) {
     const side = rand() < 0.5 ? 'home' : 'away';
-    const xi = side === 'home' ? hPlayers : aPlayers;
-    const cands = xi.filter(p => p.position !== 'GK');
-    if (!cands.length) continue;
-    const fouler = pick(cands);
     let m;
     let safety = 0;
     do { m = pickInt(8, totalMin - 4); safety++; } while (cardMins.has(m) && safety < 100);
+    const cands = availablePlayersAt(side, m).filter(p => p.position !== 'GK');
+    if (!cands.length) continue;
     cardMins.add(m);
+    const fouler = pick(cands);
     cards.push({ playerId: fouler.id || null, playerName: fouler.name, side, type: 'yellow', minute: m, reason: 'foul' });
     events.push({ minute: m, type: 'yellow', side, icon: '▪', text: templ(pick(COMMENTARY.yellow), { fouler: fouler.name, fouled: 'an opponent' }) });
   }
   if (rand() < 0.10) {
     const side = rand() < 0.5 ? 'home' : 'away';
-    const xi = side === 'home' ? hPlayers : aPlayers;
-    const cands = xi.filter(p => p.position !== 'GK');
+    const m = pickInt(20, totalMin);
+    const cands = availablePlayersAt(side, m).filter(p => p.position !== 'GK');
     if (cands.length) {
       const fouler = pick(cands);
-      const m = pickInt(20, totalMin);
       cards.push({ playerId: fouler.id || null, playerName: fouler.name, side, type: 'red', minute: m, reason: 'direct_red' });
       events.push({ minute: m, type: 'red', side, icon: '■', text: templ(pick(COMMENTARY.red), { fouler: fouler.name, fouled: 'an opponent' }) });
     }
@@ -1959,44 +2079,166 @@ function scriptedMatch({
     hScore, aScore,
     extraTime, penalties,
     events, scorers, cards,
-    injuries: [], subs: [],
-    appearances: [
-      ...hPlayers.map(p => ({ playerId: p.id || null, playerName: p.name, side: 'home', minutesPlayed: totalMin, started: true })),
-      ...aPlayers.map(p => ({ playerId: p.id || null, playerName: p.name, side: 'away', minutesPlayed: totalMin, started: true })),
-    ],
+    injuries: [], subs,
+    appearances: (() => {
+      const out = [];
+      const buildSide = (sidePlayers, side) => {
+        const sideSubs = subs.filter(s => s.side === side);
+        const offByKey = {};
+        for (const sub of sideSubs) {
+          const k = sub.offId || `__${sub.offName}`;
+          offByKey[k] = sub.minute;
+        }
+        for (const p of sidePlayers) {
+          const k = p.id || `__${p.name}`;
+          const offMin = offByKey[k];
+          out.push({
+            playerId: p.id || null, playerName: p.name, side,
+            minutesPlayed: offMin != null ? offMin : totalMin,
+            started: true,
+          });
+        }
+        for (const sub of sideSubs) {
+          out.push({
+            playerId: sub.onId, playerName: sub.onName, side,
+            minutesPlayed: Math.max(0, totalMin - sub.minute),
+            started: false,
+          });
+        }
+      };
+      buildSide(hPlayers, 'home');
+      buildSide(aPlayers, 'away');
+      return out;
+    })(),
     stats, stoppage,
     isExternal: true,
     ts: Date.now(),
   };
 }
 
+/* Auto-pick a scoreline for an external match given two XIs. Used when the
+ * user wants to "auto-simulate" a friendly without supplying the score.
+ * Stronger XI gets a higher expected goals; goals are sampled from a
+ * Poisson process (Knuth's algorithm, capped at 8). */
+function autoScoreFromXIs(homeXI, awayXI, { homeAdvantage = 0.2 } = {}) {
+  const avgRating = xi => {
+    const players = (xi?.slots || []).map(s => s.player).filter(Boolean);
+    if (!players.length) return 50;
+    return players.reduce((acc, p) => {
+      const a = p.attrs || {};
+      return acc + ((a.shooting || 50) + (a.defending || 50) + (a.passing || 50) + (a.mental || 50)) / 4;
+    }, 0) / players.length;
+  };
+  const hStr = avgRating(homeXI);
+  const aStr = avgRating(awayXI);
+  // ±1 swing from a 30-point gap. Equal teams ~ 1.3 expected goals each.
+  const baseRate = 1.3;
+  const diff = (hStr - aStr) / 30;
+  const xgH = Math.max(0.1, baseRate + diff + homeAdvantage);
+  const xgA = Math.max(0.1, baseRate - diff);
+  const samplePoisson = lambda => {
+    const L = Math.exp(-lambda);
+    let k = 0, p = 1;
+    do { k++; p *= rand(); } while (p > L && k < 9);
+    return k - 1;
+  };
+  return { hScore: samplePoisson(xgH), aScore: samplePoisson(xgA) };
+}
+
 /* Build a synthetic 11-player XI from a strength target, formation, and
  * optional name bank. Used for "Custom" external opponents. */
 function synthesizeXI({ formation = DEFAULT_FORMATION, strength = 60, nameBank = 'Generic English', nationality = '', teamName = 'Custom XI' }) {
   const formSlots = FORMATIONS[formation] || FORMATIONS[DEFAULT_FORMATION];
+  const slots = formSlots.map((f, i) => ({
+    role: f.role, x: f.x, y: f.y,
+    player: _makeSyntheticPlayer({ role: f.role, shirtNumber: i + 1, strength, nameBank, nationality }),
+  }));
+  // Synthetic 7-man bench: 1 GK + 2 DF + 2 MF + 2 FW with strength penalty.
+  const benchRoles = ['GK', 'CB', 'LB', 'CM', 'CM', 'ST', 'LW'];
+  const bench = benchRoles.map((r, i) => ({
+    player: _makeSyntheticPlayer({ role: r, shirtNumber: 12 + i, strength, nameBank, nationality }),
+  }));
+  return { formation, slots, bench };
+}
+
+/* Build a single synthetic player at a given strength + role. Shared by
+ * synthesizeXI and parseCustomRoster so a user-typed name slots into the
+ * same shape as a fully-random one. */
+function _makeSyntheticPlayer({ role, name, shirtNumber, strength = 60, nameBank = 'Generic English', nationality = '' }) {
+  const grp = ROLE_TO_GROUP[role] || 'MF';
   const bank = (state && state.nameBanks && state.nameBanks[nameBank]) || DEFAULT_NAME_BANKS[nameBank] || DEFAULT_NAME_BANKS['Generic English'];
+  const attr = (mean, w = 1) => clamp(Math.round(randNorm(mean * w, 8)), 1, 99);
+  let attrs;
+  if (grp === 'GK') attrs = { pace: attr(strength, 0.6), strength: attr(strength, 0.85), technique: attr(strength, 0.55), passing: attr(strength, 0.65), defending: attr(strength, 0.5), shooting: attr(strength, 0.2), mental: attr(strength, 0.95), goalkeeping: attr(strength, 1.15) };
+  else if (grp === 'DF') attrs = { pace: attr(strength, 0.95), strength: attr(strength, 1.0), technique: attr(strength, 0.75), passing: attr(strength, 0.85), defending: attr(strength, 1.15), shooting: attr(strength, 0.4), mental: attr(strength, 0.9), goalkeeping: 5 };
+  else if (grp === 'MF') attrs = { pace: attr(strength, 0.9), strength: attr(strength, 0.85), technique: attr(strength, 1.05), passing: attr(strength, 1.1), defending: attr(strength, 0.7), shooting: attr(strength, 0.85), mental: attr(strength, 0.95), goalkeeping: 5 };
+  else attrs = { pace: attr(strength, 1.1), strength: attr(strength, 1.0), technique: attr(strength, 1.05), passing: attr(strength, 0.85), defending: attr(strength, 0.45), shooting: attr(strength, 1.15), mental: attr(strength, 0.9), goalkeeping: 5 };
+  return {
+    id: null,
+    name: name || `${pick(bank.firstNames)} ${pick(bank.lastNames)}`,
+    position: grp,
+    role,
+    nationality,
+    shirtNumber: shirtNumber || null,
+    attrs,
+  };
+}
+
+/* Parse a free-text roster into an XI + bench. Each non-empty line is
+ *   ROLE Name [#shirt] [~strength]
+ * with `#` and `~` tags accepted in any order. A line consisting of `---`
+ * (or `===`) marks the boundary between XI and bench; otherwise the first
+ * 11 lines are the XI and any extras become the bench. Missing XI slots
+ * are filled with synthesized players at the team's base strength. */
+function parseCustomRoster(text, { formation = DEFAULT_FORMATION, baseStrength = 60, nameBank = 'Generic English', nationality = '' } = {}) {
+  const formSlots = FORMATIONS[formation] || FORMATIONS[DEFAULT_FORMATION];
+  const lines = (text || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const xiLines = []; const benchLines = [];
+  let inBench = false;
+  const parseLine = line => {
+    let s = line.trim();
+    let shirt = null, strength = null;
+    const shirtMatch = s.match(/\s+#(\d{1,3})\b/);
+    if (shirtMatch) { shirt = parseInt(shirtMatch[1]); s = s.replace(shirtMatch[0], ''); }
+    const strMatch = s.match(/\s+~(\d{1,2})\b/);
+    if (strMatch) { strength = parseInt(strMatch[1]); s = s.replace(strMatch[0], ''); }
+    s = s.trim();
+    const tokens = s.split(/\s+/);
+    if (tokens.length < 2) return null;
+    const role = tokens.shift().toUpperCase();
+    const name = tokens.join(' ');
+    return { role, name, shirt, strength };
+  };
+  for (const line of lines) {
+    if (/^[-=]{2,}/.test(line)) { inBench = true; continue; }
+    const parsed = parseLine(line);
+    if (!parsed) continue;
+    if (inBench || xiLines.length >= 11) benchLines.push(parsed);
+    else xiLines.push(parsed);
+  }
   const slots = formSlots.map((f, i) => {
-    const grp = ROLE_TO_GROUP[f.role];
-    const attr = (mean, w = 1) => clamp(Math.round(randNorm(mean * w, 8)), 1, 99);
-    let attrs;
-    if (grp === 'GK') attrs = { pace: attr(strength, 0.6), strength: attr(strength, 0.85), technique: attr(strength, 0.55), passing: attr(strength, 0.65), defending: attr(strength, 0.5), shooting: attr(strength, 0.2), mental: attr(strength, 0.95), goalkeeping: attr(strength, 1.15) };
-    else if (grp === 'DF') attrs = { pace: attr(strength, 0.95), strength: attr(strength, 1.0), technique: attr(strength, 0.75), passing: attr(strength, 0.85), defending: attr(strength, 1.15), shooting: attr(strength, 0.4), mental: attr(strength, 0.9), goalkeeping: 5 };
-    else if (grp === 'MF') attrs = { pace: attr(strength, 0.9), strength: attr(strength, 0.85), technique: attr(strength, 1.05), passing: attr(strength, 1.1), defending: attr(strength, 0.7), shooting: attr(strength, 0.85), mental: attr(strength, 0.95), goalkeeping: 5 };
-    else attrs = { pace: attr(strength, 1.1), strength: attr(strength, 1.0), technique: attr(strength, 1.05), passing: attr(strength, 0.85), defending: attr(strength, 0.45), shooting: attr(strength, 1.15), mental: attr(strength, 0.9), goalkeeping: 5 };
+    const u = xiLines[i];
     return {
-      role: f.role, x: f.x, y: f.y,
-      player: {
-        id: null,
-        name: `${pick(bank.firstNames)} ${pick(bank.lastNames)}`,
-        position: grp,
-        role: f.role,
-        nationality,
-        shirtNumber: i + 1,
-        attrs,
-      }
+      role: u?.role || f.role,
+      x: f.x, y: f.y,
+      player: _makeSyntheticPlayer({
+        role: u?.role || f.role,
+        name: u?.name,
+        shirtNumber: u?.shirt || (i + 1),
+        strength: u?.strength || baseStrength,
+        nameBank, nationality,
+      }),
     };
   });
-  return { formation, slots };
+  const bench = benchLines.map((b, i) => ({
+    player: _makeSyntheticPlayer({
+      role: b.role, name: b.name,
+      shirtNumber: b.shirt || (12 + i),
+      strength: b.strength || baseStrength,
+      nameBank, nationality,
+    }),
+  }));
+  return { formation, slots, bench };
 }
 
 /* Auto-pick best XI from a candidate pool of player IDs, given a formation. */
@@ -2026,7 +2268,13 @@ function autoPickXIFromPool(playerIds, formation = DEFAULT_FORMATION) {
     }
     if (best) { slot.player = best; used.add(best.id); }
   }
-  return { formation, slots };
+  // Bench: best 7 of the remaining pool by overall, capped at the pool size.
+  const bench = pool
+    .filter(p => !used.has(p.id))
+    .sort((a, b) => playerOverall(b) - playerOverall(a))
+    .slice(0, 7)
+    .map(p => ({ player: p }));
+  return { formation, slots, bench };
 }
 
 /* ===========================================================================
