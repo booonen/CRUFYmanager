@@ -15,6 +15,10 @@ interface NavGroup {
 
 const NAV: NavGroup[] = [
   {
+    headingKey: 'nav.section_overview',
+    items: [{ to: '/dashboard', labelKey: 'nav.dashboard', icon: '◈' }],
+  },
+  {
     headingKey: 'nav.section_main',
     items: [
       { to: '/calendar', labelKey: 'nav.calendar', icon: '◰' },

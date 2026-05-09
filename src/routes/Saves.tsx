@@ -7,6 +7,7 @@ import { t } from '../lang';
 import { downloadSavefile } from '../utils/jsonIO';
 import { useSavefileStore } from '../stores/savefile';
 import { loadSaveSlot } from '../db/persistence';
+import type { SaveSlotSummary } from '../domain/savefile';
 
 export function SavesRoute() {
   const slots = useSavefileStore((s) => s.slots);
@@ -19,6 +20,8 @@ export function SavesRoute() {
   const importFromJson = useSavefileStore((s) => s.importFromJson);
 
   const [creating, setCreating] = useState(false);
+  const [renamingSlot, setRenamingSlot] = useState<SaveSlotSummary | null>(null);
+  const [deletingSlot, setDeletingSlot] = useState<SaveSlotSummary | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -148,15 +151,7 @@ export function SavesRoute() {
                       {t('saves.switch')}
                     </Button>
                   ) : null}
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const next = window.prompt(t('saves.rename'), slot.name);
-                      if (next && next !== slot.name) {
-                        void renameSlot(slot.id, next);
-                      }
-                    }}
-                  >
+                  <Button size="sm" onClick={() => setRenamingSlot(slot)}>
                     {t('saves.rename')}
                   </Button>
                   <Button size="sm" onClick={() => void handleExport(slot.id)}>
@@ -165,11 +160,7 @@ export function SavesRoute() {
                   <Button
                     size="sm"
                     variant="danger"
-                    onClick={() => {
-                      if (window.confirm(t('saves.deleteConfirm'))) {
-                        void deleteSlot(slot.id);
-                      }
-                    }}
+                    onClick={() => setDeletingSlot(slot)}
                   >
                     {t('saves.delete')}
                   </Button>
@@ -188,7 +179,135 @@ export function SavesRoute() {
           setCreating(false);
         }}
       />
+
+      <RenameSavefileModal
+        slot={renamingSlot}
+        onCancel={() => setRenamingSlot(null)}
+        onRename={async (id, name) => {
+          await renameSlot(id, name);
+          setRenamingSlot(null);
+        }}
+      />
+
+      <DeleteSavefileModal
+        slot={deletingSlot}
+        onCancel={() => setDeletingSlot(null)}
+        onConfirm={async (id) => {
+          await deleteSlot(id);
+          setDeletingSlot(null);
+        }}
+      />
     </>
+  );
+}
+
+interface RenameSavefileModalProps {
+  slot: SaveSlotSummary | null;
+  onCancel: () => void;
+  onRename: (id: string, name: string) => Promise<void>;
+}
+
+function RenameSavefileModal({ slot, onCancel, onRename }: RenameSavefileModalProps) {
+  const [name, setName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (slot) {
+      setName(slot.name);
+      setSubmitting(false);
+    }
+  }, [slot]);
+
+  if (!slot) return null;
+
+  const trimmed = name.trim();
+  const canSubmit = trimmed.length > 0 && trimmed !== slot.name && !submitting;
+
+  const submit = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    try {
+      await onRename(slot.id, trimmed);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={true}
+      title={t('saves.renameTitle')}
+      onClose={onCancel}
+      footer={
+        <>
+          <Button onClick={onCancel}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={!canSubmit} onClick={() => void submit()}>
+            {t('saves.rename')}
+          </Button>
+        </>
+      }
+    >
+      <div className="field">
+        <label className="field__label" htmlFor="rename-input">
+          {t('saves.renameLabel')}
+        </label>
+        <input
+          id="rename-input"
+          className="input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void submit();
+          }}
+          autoFocus
+        />
+      </div>
+    </Modal>
+  );
+}
+
+interface DeleteSavefileModalProps {
+  slot: SaveSlotSummary | null;
+  onCancel: () => void;
+  onConfirm: (id: string) => Promise<void>;
+}
+
+function DeleteSavefileModal({ slot, onCancel, onConfirm }: DeleteSavefileModalProps) {
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (slot) setSubmitting(false);
+  }, [slot]);
+
+  if (!slot) return null;
+
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      await onConfirm(slot.id);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={true}
+      title={t('saves.deleteTitle')}
+      onClose={onCancel}
+      footer={
+        <>
+          <Button onClick={onCancel}>{t('common.cancel')}</Button>
+          <Button variant="danger" disabled={submitting} onClick={() => void submit()}>
+            {t('saves.delete')}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-dim" style={{ fontSize: 13 }}>
+        {t('saves.deleteWarning', { name: slot.name })}
+      </p>
+    </Modal>
   );
 }
 

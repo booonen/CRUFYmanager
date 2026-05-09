@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { CalendarRoute } from './routes/Calendar';
 import { ClubsRoute } from './routes/Clubs';
 import { CompetitionsRoute } from './routes/Competitions';
+import { DashboardRoute } from './routes/Dashboard';
 import { HistoryRoute } from './routes/History';
 import { NationalTeamRoute } from './routes/NationalTeam';
 import { OtherMatchesRoute } from './routes/OtherMatches';
@@ -25,7 +26,8 @@ export function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<Navigate to="/calendar" replace />} />
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardRoute />} />
         <Route path="/calendar" element={<CalendarRoute />} />
         <Route path="/competitions" element={<CompetitionsRoute />} />
         <Route path="/clubs" element={<ClubsRoute />} />
@@ -35,7 +37,7 @@ export function App() {
         <Route path="/history" element={<HistoryRoute />} />
         <Route path="/world" element={<WorldRoute />} />
         <Route path="/saves" element={<SavesRoute />} />
-        <Route path="*" element={<Navigate to="/calendar" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>
   );

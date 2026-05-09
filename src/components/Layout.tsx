@@ -5,9 +5,9 @@ import { Sidebar } from './Sidebar';
 export function Layout() {
   return (
     <div className="layout">
-      <Sidebar />
-      <div className="layout__main">
-        <Header />
+      <Header />
+      <div className="layout__body">
+        <Sidebar />
         <main className="content">
           <Outlet />
         </main>
