@@ -624,3 +624,32 @@ To revisit before or during the relevant phase:
 - Phase 7: transfer fees — economy is closed (money is real, finite) or open (clubs always have budget)?
 - Phase 8: which 3 templates? Suggest "Compact (BBCode table only)", "Standard (table + key events + scorers)", "Narrative (full prose match report)".
 - Phase 10: what other sports are likely? Affects how aggressive to be about abstracting the schema in earlier phases.
+
+---
+
+## 9. Phase outcomes log
+
+Append-only record of what each phase actually settled, ratified by the user, to be read alongside the per-phase proposal docs in `docs/phases/`.
+
+### Phase 0 — shipped 2026-05-09 (PR #4)
+
+Phase 0 design proposal: [`docs/phases/phase-0.md`](docs/phases/phase-0.md).
+
+**Locked:**
+- **Stack** (per §1, all confirmed): Vite + React 18 + TS strict + Zustand + Dexie 4 + React Router v6 + Vitest + nanoid. ESLint + Prettier. `noUncheckedIndexedAccess` on. No `any`.
+- **Visual language** (lifted from BRIXY/APPY, accent gold `#d4a73c`): exact CSS tokens in `src/styles/tokens.css`. DM Sans body / Fraunces display / JetBrains Mono. 56 px header, 220 px sidebar. Dark theme only.
+- **Layout chrome**: header spans the full width across the top of the viewport; sidebar tucks under it. The Dashboard sits at the top of the sidebar's "Overview" section and is the default landing route.
+- **No native dialogs**: CRUFY does not call `window.alert` / `prompt` / `confirm` anywhere. Modal-based dialogs only.
+- **Schema**: §3 implemented verbatim as TypeScript discriminated unions in `src/domain/`. `SCHEMA_VERSION = 1`. All entity types exist as scaffolding; values for stat lists / personality tags / etc. (§3.2 onward) are still placeholders awaiting Phase 1+ ratification.
+- **Persistence**: Dexie-backed multi-slot save registry from day one (`saves` and `meta` tables). Mutations flow through `useSavefileStore.updateSavefile()`, which schedules a 500 ms debounced flush of the full savefile blob. Migration scaffolding in place (only v1 today).
+- **Store pattern (clarification of §1's "one store per domain")**: a single source-of-truth Zustand store (`useSavefileStore`) holds the full active `Savefile` and the slot list; per-domain files in `src/stores/*.ts` expose thin selector hooks over it. No separate per-domain state, since the persistence unit is the savefile blob and split state would have meant pointless hydration plumbing. Domain-organised — just not multi-store.
+- **i18n**: `t()` helper + `src/lang/en.ts` ship from day one. Every visible string flows through it. No language switcher yet.
+- **Routing**: `BrowserRouter` with `basename` derived from Vite's `BASE_URL`. A `404.html` fallback (a copy of `index.html`, emitted by a tiny Vite plugin) makes deep links and refreshes work on GitHub Pages.
+- **Hosting**: GitHub Pages via Actions workflow (`.github/workflows/pages.yml`). Triggers on push to `main` and `claude/**`. Pages source is "GitHub Actions". Site at `https://booonen.github.io/CRUFYmanager/`.
+
+**Deferred / still placeholder (revisit in the relevant phase's question round):**
+- §3.2 — exact 10 game stats, exact hidden stat list, exact 8-tag personality enum, OVR computation formula. Type scaffolding exists; values pending. Lock down in Phase 1 since CRUD on players starts there.
+- §3.4 — final list of competition templates (the 6 in the plan are the working set; user has not enumerated). Lock down in Phase 3.
+- §3.5–3.7 — manager stat list, club founding semantics, national team field minimums. Lock down in Phase 1 (managers/clubs) and Phase 6 (NT).
+- Cross-savefile id re-keying on import: not needed in Phase 0 (saves are empty). Implement when Phase 1 starts producing real entity ids.
+- §8 open questions (name pools, relegation playoffs, transfer economy, report templates, multi-sport abstractions) — untouched, as designed.
