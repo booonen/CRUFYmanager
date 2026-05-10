@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from './Button';
 import { Modal } from './Modal';
+import { NamePoolPicker } from './NamePoolPicker';
 import { NumberInput } from './NumberInput';
 import { t } from '../lang';
 import { applyGeneratedSquad } from '../generation/apply';
 import { generateSquad } from '../generation/squadGen';
+import { listPools, resolvePool } from '../generation/nameGen';
 import { createRng, newSeedString } from '../generation/prng';
 import { DEFAULT_SQUAD_SIZE } from '../generation/shapes';
 import { useSavefileStore } from '../stores/savefile';
@@ -21,9 +23,15 @@ export function GenerateSquadModal({ open, club, onClose }: GenerateSquadModalPr
   const countryName = useSavefileStore((s) => s.savefile?.meta.countryName ?? '');
   const flushNow = useSavefileStore((s) => s.flushNow);
 
+  const initialPool = useMemo(
+    () => resolvePool(countryName)?.code ?? listPools()[0]?.code ?? 'english',
+    [countryName],
+  );
+
   const [targetOvr, setTargetOvr] = useState(club.ovr || 70);
   const [squadSize, setSquadSize] = useState(DEFAULT_SQUAD_SIZE);
   const [nationality, setNationality] = useState(countryName);
+  const [poolCode, setPoolCode] = useState(initialPool);
   const [replace, setReplace] = useState(false);
   const [seed, setSeed] = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -34,11 +42,12 @@ export function GenerateSquadModal({ open, club, onClose }: GenerateSquadModalPr
       setTargetOvr(club.ovr || 70);
       setSquadSize(DEFAULT_SQUAD_SIZE);
       setNationality(countryName);
+      setPoolCode(initialPool);
       setReplace(false);
       setSeed('');
       setBusy(false);
     }
-  }, [open, club, countryName]);
+  }, [open, club, countryName, initialPool]);
 
   if (!calendar) return null;
 
@@ -71,6 +80,7 @@ export function GenerateSquadModal({ open, club, onClose }: GenerateSquadModalPr
         calendar,
         clubId: club.id,
         nationality: nationality.trim(),
+        poolCode,
         targetClubOvr: targetOvr,
         squadSize: toGenerate,
         takenSquadNumbers: taken,
@@ -128,6 +138,10 @@ export function GenerateSquadModal({ open, club, onClose }: GenerateSquadModalPr
             value={nationality}
             onChange={(e) => setNationality(e.target.value)}
           />
+        </div>
+        <div className="field">
+          <label className="field__label">{t('generator.namebase')}</label>
+          <NamePoolPicker value={poolCode} onChange={setPoolCode} />
         </div>
       </div>
 

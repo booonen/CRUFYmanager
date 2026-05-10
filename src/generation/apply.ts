@@ -1,5 +1,4 @@
 import type { Manager } from '../domain/manager';
-import type { ForeignClub, ForeignLeague } from '../domain/foreignWorld';
 import { recomputeClubOvrs } from '../stores/clubs';
 import { useSavefileStore } from '../stores/savefile';
 import type { GeneratedLeague } from './leagueGen';
@@ -50,21 +49,5 @@ export function applyGeneratedManagers(managers: Manager[]): void {
   useSavefileStore.getState().updateSavefile((sf) => ({
     ...sf,
     managers: [...sf.managers, ...managers],
-  }));
-}
-
-export interface ForeignLeagueAddition {
-  league: ForeignLeague;
-  clubs: ForeignClub[];
-}
-
-export function applyGeneratedForeignLeague(addition: ForeignLeagueAddition): void {
-  useSavefileStore.getState().updateSavefile((sf) => ({
-    ...sf,
-    foreignWorld: {
-      ...sf.foreignWorld,
-      leagues: [...sf.foreignWorld.leagues, addition.league],
-      clubs: [...sf.foreignWorld.clubs, ...addition.clubs],
-    },
   }));
 }

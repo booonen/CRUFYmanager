@@ -9,6 +9,7 @@ import { OvrBadge } from './OvrBadge';
 import { PositionPill } from './PositionPill';
 import { PlayerFormModal } from './PlayerFormModal';
 import { t } from '../lang';
+import type { Calendar } from '../domain/calendar';
 import type { Club } from '../domain/club';
 import { displayName, type DomesticPlayer } from '../domain/player';
 import { isFreeAgentsClub } from '../utils/freeAgents';
@@ -39,12 +40,7 @@ export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
 
   if (!calendar) return null;
 
-  const sortedSquad = [...squad].sort((a, b) => {
-    const an = a.squadNumber ?? 999;
-    const bn = b.squadNumber ?? 999;
-    if (an !== bn) return an - bn;
-    return b.stats.ovr - a.stats.ovr;
-  });
+  const squadGroups = groupSquadByRank(squad);
 
   return (
     <div className="panel">
@@ -143,7 +139,7 @@ export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
           }}
         >
           <div className="form-section__heading">
-            {t('clubs.detail.squad')} ({sortedSquad.length})
+            {t('clubs.detail.squad')} ({squad.length})
           </div>
           {!isFreeAgents ? (
             <div style={{ display: 'flex', gap: 6 }}>
@@ -157,7 +153,7 @@ export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
           ) : null}
         </div>
 
-        {sortedSquad.length === 0 ? (
+        {squad.length === 0 ? (
           <div className="text-dim" style={{ padding: 16, fontSize: 13 }}>
             {t('clubs.detail.squadEmpty')}
           </div>
@@ -173,19 +169,17 @@ export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
               </tr>
             </thead>
             <tbody>
-              {sortedSquad.map((p) => (
-                <tr key={p.id} onClick={() => navigate(`/players/${p.id}`)}>
-                  <td className="mono text-dim">{p.squadNumber ?? '—'}</td>
-                  <td>{displayName(p)}</td>
-                  <td>
-                    <PositionPill position={p.position} />
-                  </td>
-                  <td className="mono">{computeAge(p.dateOfBirth, calendar)}</td>
-                  <td>
-                    <OvrBadge value={p.stats.ovr} size="sm" />
-                  </td>
-                </tr>
-              ))}
+              {squadGroups.map((group) =>
+                group.players.length === 0 ? null : (
+                  <SquadGroupRows
+                    key={group.label}
+                    label={group.label}
+                    players={group.players}
+                    onClickPlayer={(id) => navigate(`/players/${id}`)}
+                    calendar={calendar}
+                  />
+                ),
+              )}
             </tbody>
           </table>
         )}
@@ -243,5 +237,61 @@ function Stat({ label, value }: { label: string; value: string | number }) {
       <div className="stat-card__value">{value}</div>
       <div className="stat-card__label">{label}</div>
     </div>
+  );
+}
+
+interface SquadGroup {
+  label: string;
+  players: DomesticPlayer[];
+}
+
+function groupSquadByRank(squad: DomesticPlayer[]): SquadGroup[] {
+  const groups: SquadGroup[] = [
+    { label: 'GK', players: [] },
+    { label: 'DEF', players: [] },
+    { label: 'MID', players: [] },
+    { label: 'FWD', players: [] },
+  ];
+  for (const p of squad) {
+    if (p.position === 'GK') groups[0]!.players.push(p);
+    else if (p.position.startsWith('DEF')) groups[1]!.players.push(p);
+    else if (p.position.startsWith('MID')) groups[2]!.players.push(p);
+    else groups[3]!.players.push(p);
+  }
+  for (const g of groups) {
+    g.players.sort((a, b) => b.stats.ovr - a.stats.ovr);
+  }
+  return groups;
+}
+
+interface SquadGroupRowsProps {
+  label: string;
+  players: DomesticPlayer[];
+  onClickPlayer: (id: string) => void;
+  calendar: Calendar;
+}
+
+function SquadGroupRows({ label, players, onClickPlayer, calendar }: SquadGroupRowsProps) {
+  return (
+    <>
+      <tr className="data-table__group">
+        <td colSpan={5} className="text-dim mono" style={{ fontSize: 11, paddingTop: 8 }}>
+          {label} · {players.length}
+        </td>
+      </tr>
+      {players.map((p) => (
+        <tr key={p.id} onClick={() => onClickPlayer(p.id)}>
+          <td className="mono text-dim">{p.squadNumber ?? '—'}</td>
+          <td>{displayName(p)}</td>
+          <td>
+            <PositionPill position={p.position} />
+          </td>
+          <td className="mono">{computeAge(p.dateOfBirth, calendar)}</td>
+          <td>
+            <OvrBadge value={p.stats.ovr} size="sm" />
+          </td>
+        </tr>
+      ))}
+    </>
   );
 }

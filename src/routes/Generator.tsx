@@ -1,18 +1,24 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
+import { NamePoolPicker } from '../components/NamePoolPicker';
 import { NumberInput } from '../components/NumberInput';
 import { PageHeading } from '../components/PageHeading';
-import { newId } from '../utils/ids';
-import { applyGeneratedForeignLeague, applyGeneratedLeague, applyGeneratedManagers } from '../generation/apply';
+import { applyGeneratedLeague, applyGeneratedManagers } from '../generation/apply';
 import { generateLeague } from '../generation/leagueGen';
 import { generateManager } from '../generation/managerGen';
-import { generateClubName } from '../generation/nameGen';
+import { listPools, resolvePool } from '../generation/nameGen';
 import { createRng, newSeedString } from '../generation/prng';
 import { TIER_OVR_STEP, TIER_OVR_TOP } from '../generation/shapes';
 import { t } from '../lang';
 import { useSavefileStore } from '../stores/savefile';
+
+/** Best-guess pool for a country name, used only to seed the picker on first open. */
+function defaultPoolForCountry(country: string): string {
+  const list = listPools();
+  return resolvePool(country)?.code ?? list[0]?.code ?? 'english';
+}
 
 export function GeneratorRoute() {
   const status = useSavefileStore((s) => s.status);
@@ -39,7 +45,6 @@ export function GeneratorRoute() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <LeagueGeneratorPanel defaultCountry={savefile.meta.countryName} />
         <ManagerGeneratorPanel defaultCountry={savefile.meta.countryName} />
-        <ForeignLeagueGeneratorPanel />
       </div>
     </>
   );
@@ -98,6 +103,8 @@ function SeedField({ seed, setSeed }: SeedFieldProps) {
 
 function LeagueGeneratorPanel({ defaultCountry }: { defaultCountry: string }) {
   const [country, setCountry] = useState(defaultCountry);
+  const initialPool = useMemo(() => defaultPoolForCountry(defaultCountry), [defaultCountry]);
+  const [poolCode, setPoolCode] = useState(initialPool);
   const [tierCount, setTierCount] = useState(4);
   const [clubsPerTier, setClubsPerTier] = useState(16);
   const [topTierOvr, setTopTierOvr] = useState(TIER_OVR_TOP);
@@ -120,6 +127,7 @@ function LeagueGeneratorPanel({ defaultCountry }: { defaultCountry: string }) {
         rng,
         calendar,
         countryName: country.trim(),
+        poolCode,
         tierCount,
         clubsPerTier,
         topTierOvr,
@@ -157,6 +165,12 @@ function LeagueGeneratorPanel({ defaultCountry }: { defaultCountry: string }) {
         <div className="field">
           <label className="field__label">{t('generator.league.country')}</label>
           <input className="input" value={country} onChange={(e) => setCountry(e.target.value)} />
+          <div className="field__hint">{t('generator.countryHint')}</div>
+        </div>
+        <div className="field">
+          <label className="field__label">{t('generator.namebase')}</label>
+          <NamePoolPicker value={poolCode} onChange={setPoolCode} />
+          <div className="field__hint">{t('generator.namebaseHint')}</div>
         </div>
         <div className="field">
           <label className="field__label">{t('generator.league.tierCount')}</label>
@@ -216,6 +230,8 @@ function LeagueGeneratorPanel({ defaultCountry }: { defaultCountry: string }) {
 
 function ManagerGeneratorPanel({ defaultCountry }: { defaultCountry: string }) {
   const [country, setCountry] = useState(defaultCountry);
+  const initialPool = useMemo(() => defaultPoolForCountry(defaultCountry), [defaultCountry]);
+  const [poolCode, setPoolCode] = useState(initialPool);
   const [count, setCount] = useState(10);
   const [seed, setSeed] = useState('');
   const [busy, setBusy] = useState(false);
@@ -226,7 +242,7 @@ function ManagerGeneratorPanel({ defaultCountry }: { defaultCountry: string }) {
     try {
       const rng = createRng(seed.trim() || newSeedString());
       const managers = Array.from({ length: count }, () =>
-        generateManager({ rng, nationality: country.trim() }),
+        generateManager({ rng, nationality: country.trim(), poolCode }),
       );
       applyGeneratedManagers(managers);
       await flushNow();
@@ -242,6 +258,10 @@ function ManagerGeneratorPanel({ defaultCountry }: { defaultCountry: string }) {
         <div className="field">
           <label className="field__label">{t('generator.league.country')}</label>
           <input className="input" value={country} onChange={(e) => setCountry(e.target.value)} />
+        </div>
+        <div className="field">
+          <label className="field__label">{t('generator.namebase')}</label>
+          <NamePoolPicker value={poolCode} onChange={setPoolCode} />
         </div>
         <div className="field">
           <label className="field__label">{t('generator.managers.count')}</label>
@@ -264,89 +284,3 @@ function ManagerGeneratorPanel({ defaultCountry }: { defaultCountry: string }) {
   );
 }
 
-function ForeignLeagueGeneratorPanel() {
-  const [country, setCountry] = useState('Spain');
-  const [tier, setTier] = useState(1);
-  const [clubCount, setClubCount] = useState(16);
-  const [ovr, setOvr] = useState(70);
-  const [seed, setSeed] = useState('');
-  const [busy, setBusy] = useState(false);
-  const flushNow = useSavefileStore((s) => s.flushNow);
-
-  const handleSubmit = async () => {
-    setBusy(true);
-    try {
-      const rng = createRng(seed.trim() || newSeedString());
-      const leagueId = newId();
-      const league = {
-        id: leagueId,
-        name: `${country.trim()} Tier ${tier}`,
-        countryName: country.trim(),
-        tier,
-      };
-      const clubs = Array.from({ length: clubCount }, () => {
-        const identity = generateClubName(country.trim(), rng);
-        return {
-          id: newId(),
-          name: identity.name,
-          leagueId,
-          countryName: country.trim(),
-          ovr: Math.max(20, Math.min(95, ovr + Math.floor(rng.range(-6, 6)))),
-          logoUrl: null as string | null,
-        };
-      });
-      applyGeneratedForeignLeague({ league, clubs });
-      await flushNow();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="panel">
-      <PanelHead heading={t('generator.foreign.heading')} body={t('generator.foreign.body')} />
-      <div className="form-grid">
-        <div className="field">
-          <label className="field__label">{t('generator.league.country')}</label>
-          <input className="input" value={country} onChange={(e) => setCountry(e.target.value)} />
-        </div>
-        <div className="field">
-          <label className="field__label">{t('generator.league.tierCount')}</label>
-          <NumberInput
-            className="input mono"
-            min={1}
-            max={6}
-            value={tier}
-            onCommit={setTier}
-          />
-        </div>
-        <div className="field">
-          <label className="field__label">{t('generator.league.clubsPerTier')}</label>
-          <NumberInput
-            className="input mono"
-            min={2}
-            max={32}
-            value={clubCount}
-            onCommit={setClubCount}
-          />
-        </div>
-        <div className="field">
-          <label className="field__label">{t('world.fields.ovr')}</label>
-          <NumberInput
-            className="input mono"
-            min={20}
-            max={95}
-            value={ovr}
-            onCommit={setOvr}
-          />
-        </div>
-      </div>
-      <SeedField seed={seed} setSeed={setSeed} />
-      <div style={{ marginTop: 12 }}>
-        <Button variant="primary" disabled={busy} onClick={() => void handleSubmit()}>
-          {busy ? t('generator.busy') : t('generator.foreign.submit')}
-        </Button>
-      </div>
-    </div>
-  );
-}

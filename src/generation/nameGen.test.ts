@@ -55,10 +55,23 @@ describe('nameGen', () => {
 
   it('generateClubName uses {city} substitution and produces a sensible shortName', () => {
     const rng = createRng('club-name');
-    const { name, shortName, city } = generateClubName('England', rng);
+    const { name, shortName, city } = generateClubName(rng, { nationality: 'England' });
     expect(name).toContain(city);
     expect(shortName.length).toBeGreaterThan(0);
     expect(shortName.length).toBeLessThanOrEqual(4);
+  });
+
+  it('explicit poolCode overrides nationality alias lookup', () => {
+    const rng = createRng('explicit-pool');
+    const { firstName, lastName } = generateFullName({
+      rng,
+      nationality: 'France', // would alias to "french"
+      poolCode: 'japanese', // explicit override wins
+    });
+    // Both name parts must come from the Japanese pool (case-insensitive set membership).
+    const japanese = listPools().find((p) => p.code === 'japanese')!;
+    expect(japanese.firstNames).toContain(firstName);
+    expect(japanese.lastNames).toContain(lastName);
   });
 
   it('every pool has at least 50 first names + 50 last names + 20 cities + 4 templates', () => {

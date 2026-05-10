@@ -25,15 +25,18 @@ const STYLES: TacticalProfile[] = [
 
 export interface GenerateManagerInput {
   rng: Rng;
+  /** Stored on the manager. */
   nationality: string;
+  /** Optional explicit name pool. */
+  poolCode?: string;
   /** Mean of the stat curve (0-100). Default 65. */
   targetMean?: number;
 }
 
 export function generateManager(input: GenerateManagerInput): Manager {
-  const { rng, nationality } = input;
+  const { rng, nationality, poolCode } = input;
   const mean = input.targetMean ?? 65;
-  const { firstName, lastName } = generateFullName({ nationality, rng });
+  const { firstName, lastName } = generateFullName({ rng, poolCode, nationality });
 
   const stats = sampleManagerStats(rng, mean);
   return {

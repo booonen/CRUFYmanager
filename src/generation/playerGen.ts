@@ -18,16 +18,19 @@ export interface GeneratePlayerInput {
   position: Position;
   age: number;
   targetOvr: number;
+  /** Stored on the player. */
   nationality: string;
+  /** Optional explicit name pool. If unset, falls back to nationality alias lookup. */
+  poolCode?: string;
   clubId: string;
   squadNumber?: number | null;
 }
 
 export function generatePlayer(input: GeneratePlayerInput): DomesticPlayer {
-  const { rng, calendar, position, age, targetOvr, nationality, clubId } = input;
+  const { rng, calendar, position, age, targetOvr, nationality, poolCode, clubId } = input;
   const stats = sampleStatBlock(rng, position, targetOvr);
   const ovr = computeOvr(position, stats);
-  const { firstName, lastName } = generateFullName({ nationality, rng });
+  const { firstName, lastName } = generateFullName({ rng, poolCode, nationality });
 
   const personalities = samplePersonalities(rng);
   const potential = samplePotential(rng, age, ovr);

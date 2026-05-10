@@ -12,6 +12,8 @@ export interface GenerateLeagueInput {
   rng: Rng;
   calendar: Calendar;
   countryName: string;
+  /** Optional explicit name pool. When unset, falls back to nationality alias lookup. */
+  poolCode?: string;
   /** Number of tiers (1-6 reasonable). */
   tierCount: number;
   /** Clubs per tier (same for all tiers). */
@@ -37,6 +39,7 @@ export function generateLeague(input: GenerateLeagueInput): GeneratedLeague {
     rng,
     calendar,
     countryName,
+    poolCode,
     tierCount,
     clubsPerTier,
     topTierOvr = TIER_OVR_TOP,
@@ -58,11 +61,12 @@ export function generateLeague(input: GenerateLeagueInput): GeneratedLeague {
       const t = clubsPerTier === 1 ? 0.5 : clubIdx / (clubsPerTier - 1);
       const targetOvr = Math.round(midOvr + tierSpread - 2 * tierSpread * t);
 
-      const club = generateClubIdentity({ rng, nationality: countryName });
+      const club = generateClubIdentity({ rng, nationality: countryName, poolCode });
 
       const manager = generateManager({
         rng,
         nationality: countryName,
+        poolCode,
         targetMean: Math.max(50, Math.min(85, targetOvr - 5)),
       });
       manager.contractClubId = club.id;
@@ -75,6 +79,7 @@ export function generateLeague(input: GenerateLeagueInput): GeneratedLeague {
         calendar,
         clubId: club.id,
         nationality: countryName,
+        poolCode,
         targetClubOvr: targetOvr,
       });
       club.squadPlayerIds = players.map((p) => p.id);

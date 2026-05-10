@@ -63,8 +63,11 @@ export function resolvePool(nationality: string): NamePool {
 }
 
 export interface NameGenInput {
-  nationality: string;
   rng: Rng;
+  /** Explicit pool to draw names from. Takes precedence over nationality alias lookup. */
+  poolCode?: string;
+  /** Free-text nationality (used as fallback when poolCode is unset). */
+  nationality?: string;
 }
 
 export interface FullName {
@@ -72,11 +75,20 @@ export interface FullName {
   lastName: string;
 }
 
-export function generateFullName({ nationality, rng }: NameGenInput): FullName {
-  const pool = resolvePool(nationality);
+/** Resolve a pool from poolCode (preferred) or nationality alias (fallback). */
+export function pickPool(opts: { poolCode?: string; nationality?: string }): NamePool {
+  if (opts.poolCode) {
+    const direct = getPool(opts.poolCode);
+    if (direct) return direct;
+  }
+  return resolvePool(opts.nationality ?? '');
+}
+
+export function generateFullName(input: NameGenInput): FullName {
+  const pool = pickPool(input);
   return {
-    firstName: rng.pick(pool.firstNames),
-    lastName: rng.pick(pool.lastNames),
+    firstName: input.rng.pick(pool.firstNames),
+    lastName: input.rng.pick(pool.lastNames),
   };
 }
 
@@ -87,8 +99,11 @@ export interface ClubIdentityName {
 }
 
 /** Pick a city + apply a club template. e.g. "Hamburg" + "{city} FC" → "Hamburg FC". */
-export function generateClubName(nationality: string, rng: Rng): ClubIdentityName {
-  const pool = resolvePool(nationality);
+export function generateClubName(
+  rng: Rng,
+  opts: { poolCode?: string; nationality?: string },
+): ClubIdentityName {
+  const pool = pickPool(opts);
   const city = rng.pick(pool.cities);
   const template = rng.pick(pool.clubTemplates);
   const name = template.replace('{city}', city);
