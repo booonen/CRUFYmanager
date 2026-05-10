@@ -2,11 +2,17 @@ interface ColorSwatchPickerProps {
   primary: string;
   secondary: string;
   onChange: (next: { primary: string; secondary: string }) => void;
+  onRandomize?: () => void;
 }
 
-export function ColorSwatchPicker({ primary, secondary, onChange }: ColorSwatchPickerProps) {
+export function ColorSwatchPicker({
+  primary,
+  secondary,
+  onChange,
+  onRandomize,
+}: ColorSwatchPickerProps) {
   return (
-    <div className="color-pair">
+    <div className="color-stack">
       <ColorField
         label="Primary"
         value={primary}
@@ -17,9 +23,21 @@ export function ColorSwatchPicker({ primary, secondary, onChange }: ColorSwatchP
         value={secondary}
         onChange={(v) => onChange({ primary, secondary: v })}
       />
-      <div className="color-pair__preview">
-        <span className="color-pair__chip" style={{ background: primary }} />
-        <span className="color-pair__chip" style={{ background: secondary }} />
+      <div className="color-stack__preview-row">
+        <div className="color-stack__preview">
+          <span className="color-stack__chip" style={{ background: primary }} />
+          <span className="color-stack__chip" style={{ background: secondary }} />
+        </div>
+        {onRandomize ? (
+          <button
+            type="button"
+            className="btn btn--sm"
+            onClick={onRandomize}
+            style={{ marginLeft: 'auto' }}
+          >
+            Randomize
+          </button>
+        ) : null}
       </div>
     </div>
   );

@@ -40,6 +40,56 @@ const migrations: Record<number, Migration> = {
       meta: { ...sf.meta, schemaVersion: 3 },
     };
   },
+  3: (sf) => {
+    const clubs = sf.clubs.map((c) => ({ ...c, logoUrl: c.logoUrl ?? null }));
+
+    const players = sf.players.map((p) => {
+      const legacy = p as unknown as {
+        name?: string;
+        firstName?: string;
+        lastName?: string;
+        preferredFoot?: unknown;
+      };
+      const cleaned = { ...p } as unknown as Record<string, unknown>;
+      delete cleaned.preferredFoot;
+      if (typeof legacy.firstName === 'string' && typeof legacy.lastName === 'string') {
+        delete cleaned.name;
+        return cleaned as unknown as Player;
+      }
+      const raw = (legacy.name ?? '').trim();
+      const tokens = raw ? raw.split(/\s+/) : [];
+      let firstName = '';
+      let lastName = '';
+      if (tokens.length >= 2) {
+        firstName = tokens.slice(0, -1).join(' ');
+        lastName = tokens[tokens.length - 1] ?? '';
+      } else {
+        firstName = tokens[0] ?? '';
+        lastName = '';
+      }
+      cleaned.firstName = firstName;
+      cleaned.lastName = lastName;
+      delete cleaned.name;
+      return cleaned as unknown as Player;
+    });
+
+    const foreignWorld = {
+      ...sf.foreignWorld,
+      clubs: sf.foreignWorld.clubs.map((c) => ({ ...c, logoUrl: c.logoUrl ?? null })),
+      nationalTeams: sf.foreignWorld.nationalTeams.map((nt) => ({
+        ...nt,
+        flagUrl: nt.flagUrl ?? null,
+      })),
+    };
+
+    return {
+      ...sf,
+      clubs,
+      players,
+      foreignWorld,
+      meta: { ...sf.meta, schemaVersion: 4 },
+    };
+  },
 };
 
 export function migrate(savefile: Savefile): Savefile {

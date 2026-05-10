@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from './Button';
+import { ClubLogo } from './ClubLogo';
 import { ConfirmModal } from './ConfirmModal';
 import { ManagerAssignModal } from './ManagerAssignModal';
 import { OvrBadge } from './OvrBadge';
@@ -7,7 +9,7 @@ import { PositionPill } from './PositionPill';
 import { PlayerFormModal } from './PlayerFormModal';
 import { t } from '../lang';
 import type { Club } from '../domain/club';
-import type { DomesticPlayer } from '../domain/player';
+import { displayName, type DomesticPlayer } from '../domain/player';
 import { isFreeAgentsClub } from '../utils/freeAgents';
 import { computeAge } from '../utils/age';
 import { useSavefileStore } from '../stores/savefile';
@@ -24,6 +26,7 @@ interface ClubDetailProps {
 }
 
 export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
+  const navigate = useNavigate();
   const calendar = useSavefileStore((s) => s.savefile?.calendar ?? null);
   const countryName = useSavefileStore((s) => s.savefile?.meta.countryName ?? '');
   const manager = useManager(club.managerId);
@@ -43,11 +46,14 @@ export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
 
   return (
     <div className="panel">
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 16 }}>
-        <span className="kit-swatches" style={{ marginTop: 6 }}>
-          <span style={{ background: club.colors.primary, width: 22, height: 22 }} />
-          <span style={{ background: club.colors.secondary, width: 22, height: 22 }} />
-        </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+        <ClubLogo
+          logoUrl={club.logoUrl}
+          primary={club.colors.primary}
+          secondary={club.colors.secondary}
+          size="lg"
+          alt={club.name}
+        />
         <div style={{ flex: 1 }}>
           <h2 style={{ marginBottom: 2 }}>{club.name}</h2>
           <div className="text-dim" style={{ fontSize: 13 }}>
@@ -157,14 +163,13 @@ export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
                 <th>Pos</th>
                 <th>Age</th>
                 <th>OVR</th>
-                <th>Foot</th>
               </tr>
             </thead>
             <tbody>
               {sortedSquad.map((p) => (
-                <tr key={p.id}>
+                <tr key={p.id} onClick={() => navigate(`/players/${p.id}`)}>
                   <td className="mono text-dim">{p.squadNumber ?? '—'}</td>
-                  <td>{p.name}</td>
+                  <td>{displayName(p)}</td>
                   <td>
                     <PositionPill position={p.position} />
                   </td>
@@ -172,7 +177,6 @@ export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
                   <td>
                     <OvrBadge value={p.stats.ovr} size="sm" />
                   </td>
-                  <td className="mono text-dim">{p.preferredFoot}</td>
                 </tr>
               ))}
             </tbody>

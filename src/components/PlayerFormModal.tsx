@@ -7,7 +7,7 @@ import { PersonalityPicker } from './PersonalityPicker';
 import { PositionPicker } from './PositionPicker';
 import { StatSlider } from './StatSlider';
 import { t } from '../lang';
-import type { DomesticPlayer, GameStat, PreferredFoot } from '../domain/player';
+import type { DomesticPlayer, GameStat } from '../domain/player';
 import { GK_GAME_STATS, OUTFIELD_GAME_STATS } from '../domain/player';
 import { computeOvr, defaultStatBlock } from '../utils/ovr';
 import {
@@ -27,8 +27,6 @@ interface PlayerFormModalProps {
   onCancel: () => void;
   onSubmit: (input: PlayerFormInput) => void | Promise<void>;
 }
-
-const FEET: PreferredFoot[] = ['L', 'R', 'Both'];
 
 const STAT_LABELS: Record<GameStat, string> = {
   pace: 'Pace',
@@ -82,7 +80,8 @@ export function PlayerFormModal({
   const ovr = useMemo(() => computeOvr(form.position, form.stats), [form.position, form.stats]);
   const isGK = form.position === 'GK';
 
-  const canSubmit = form.name.trim().length > 0 && !submitting;
+  const canSubmit =
+    (form.firstName.trim().length > 0 || form.lastName.trim().length > 0) && !submitting;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -112,12 +111,20 @@ export function PlayerFormModal({
         <div className="form-section__heading">{t('players.sections.identity')}</div>
         <div className="form-grid">
           <div className="field">
-            <label className="field__label">{t('players.fields.name')}</label>
+            <label className="field__label">{t('players.fields.firstName')}</label>
             <input
               className="input"
-              value={form.name}
+              value={form.firstName}
               autoFocus
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+            />
+          </div>
+          <div className="field">
+            <label className="field__label">{t('players.fields.lastName')}</label>
+            <input
+              className="input"
+              value={form.lastName}
+              onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
             />
           </div>
           <div className="field">
@@ -138,21 +145,6 @@ export function PlayerFormModal({
               onCommit={(v) => setForm((f) => ({ ...f, age: v }))}
             />
             <div className="field__hint">{t('players.fields.ageHint')}</div>
-          </div>
-          <div className="field">
-            <label className="field__label">{t('players.fields.preferredFoot')}</label>
-            <div className="chip-row">
-              {FEET.map((foot) => (
-                <button
-                  key={foot}
-                  type="button"
-                  className={form.preferredFoot === foot ? 'chip chip--active' : 'chip'}
-                  onClick={() => setForm((f) => ({ ...f, preferredFoot: foot }))}
-                >
-                  {t(`feet.${foot}`)}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
         <div className="field">
@@ -315,10 +307,10 @@ function makeInitial(
     return newPlayerFormInput(calendar, FREE_AGENTS_CLUB_ID, { nationality: countryName });
   }
   return {
-    name: '',
+    firstName: '',
+    lastName: '',
     nationality: countryName,
     position: 'MID-CM',
-    preferredFoot: 'R',
     age: 22,
     clubId: FREE_AGENTS_CLUB_ID,
     contractUntilSeason: 4,

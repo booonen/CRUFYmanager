@@ -12,6 +12,7 @@ export interface ClubInput {
   founded: number;
   colors: ClubColors;
   stadium: ClubStadium;
+  logoUrl: string | null;
   finances: ClubFinances;
   managerId: string | null;
 }
@@ -46,6 +47,7 @@ export function addClub(input: ClubInput): string {
         founded: input.founded,
         colors: input.colors,
         stadium: input.stadium,
+        logoUrl: input.logoUrl,
         managerId: input.managerId,
         squadPlayerIds: [],
         ovr: 0,
@@ -73,6 +75,7 @@ export function updateClub(id: string, patch: Partial<ClubInput>): void {
         founded: patch.founded ?? c.founded,
         colors: patch.colors ?? c.colors,
         stadium: patch.stadium ?? c.stadium,
+        logoUrl: patch.logoUrl !== undefined ? patch.logoUrl : c.logoUrl,
         finances: patch.finances ?? c.finances,
       };
     }),

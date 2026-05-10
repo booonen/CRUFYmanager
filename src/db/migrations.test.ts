@@ -163,3 +163,37 @@ describe('migrate v2 -> v3', () => {
     expect(p.stats.personalities).toEqual(['Professional']);
   });
 });
+
+describe('migrate v3 -> v4', () => {
+  it('splits a legacy "First Last" name into firstName + lastName and drops preferredFoot', () => {
+    const start = v2SavefileWithLegacyPlayer();
+    const result = migrate(start);
+    const p = result.players.find((pp) => pp.id === 'legacy');
+    if (!p || p.tier !== 'domestic') throw new Error('expected domestic player');
+    expect(p.firstName).toBe('Legacy');
+    expect(p.lastName).toBe('P');
+    expect((p as unknown as Record<string, unknown>).name).toBeUndefined();
+    expect((p as unknown as Record<string, unknown>).preferredFoot).toBeUndefined();
+  });
+
+  it('handles a single-token name as firstName with empty lastName', () => {
+    const start = v2SavefileWithLegacyPlayer();
+    const oneTokenStart: Savefile = {
+      ...start,
+      players: start.players.map((p) =>
+        p.id === 'legacy' ? ({ ...p, name: 'Mononym' } as unknown as typeof p) : p,
+      ),
+    };
+    const result = migrate(oneTokenStart);
+    const p = result.players.find((pp) => pp.id === 'legacy');
+    if (!p || p.tier !== 'domestic') throw new Error('expected domestic player');
+    expect(p.firstName).toBe('Mononym');
+    expect(p.lastName).toBe('');
+  });
+
+  it('adds Club.logoUrl = null to existing clubs and Free Agents', () => {
+    const result = migrate(v1Savefile());
+    expect(result.clubs.every((c) => 'logoUrl' in c)).toBe(true);
+    expect(result.clubs.every((c) => c.logoUrl === null)).toBe(true);
+  });
+});

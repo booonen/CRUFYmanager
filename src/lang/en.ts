@@ -25,6 +25,8 @@ export const en = {
   dashboard: {
     welcome: 'Welcome to {country}',
     sub: 'Build out clubs, squads, and managers manually. Procedural generation arrives in Phase 2.',
+    overviewTab: 'Overview',
+    issuesTab: 'Issues',
     stats: {
       season: 'Season',
       matchday: 'Matchday',
@@ -34,11 +36,11 @@ export const en = {
       competitions: 'Competitions',
       fixtures: 'Fixtures (season)',
     },
-    coverage: {
-      title: 'Squad coverage warnings',
-      under: '{name} has {count} players (under 11)',
-      over: '{name} has {count} players (over 30)',
-      noManager: '{name} has no manager assigned',
+    issues: {
+      none: 'No issues. Clubs are appropriately staffed and have managers.',
+      under: '{name} has {count} players — under the 11-player minimum.',
+      over: '{name} has {count} players — over the 30-player soft cap.',
+      noManager: '{name} has no manager assigned.',
     },
   },
   clubs: {
@@ -69,6 +71,9 @@ export const en = {
       ovr: 'OVR',
       finances: 'Finances',
       balance: 'Balance',
+      back: 'Back to clubs',
+      notFound: 'Club not found',
+      notFoundBody: 'It may have been deleted. Head back to the club list.',
     },
     fields: {
       name: 'Full name',
@@ -81,6 +86,8 @@ export const en = {
       stadiumCapacity: 'Capacity',
       colors: 'Kit colors',
       balance: 'Opening balance',
+      logoUrl: 'Logo URL',
+      logoUrlHint: 'Optional. A direct link to a logo image (PNG / SVG).',
     },
     freeAgents: 'Free Agents',
     freeAgentsBody: 'Players currently without a club. They live here until you assign them.',
@@ -128,10 +135,10 @@ export const en = {
       condition: 'Condition',
     },
     fields: {
-      name: 'Full name',
+      firstName: 'First name',
+      lastName: 'Last name',
       nationality: 'Nationality',
       position: 'Primary position',
-      preferredFoot: 'Preferred foot',
       age: 'Age',
       ageHint: 'Stored as DOB relative to the current calendar position.',
       club: 'Club',
@@ -211,11 +218,6 @@ export const en = {
       leagues: 'No foreign leagues yet.',
       clubs: 'No foreign clubs yet. Add a league first if needed.',
     },
-  },
-  feet: {
-    L: 'Left',
-    R: 'Right',
-    Both: 'Both',
   },
   styles: {
     defensive: 'Defensive',

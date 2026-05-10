@@ -24,8 +24,6 @@ export const POSITION_GROUPS = {
   FWD: ['FWD-LW', 'FWD-RW', 'FWD-ST'],
 } as const satisfies Record<string, readonly Position[]>;
 
-export type PreferredFoot = 'L' | 'R' | 'Both';
-
 export const PERSONALITY_TAGS = [
   'Professional',
   'Mercurial',
@@ -98,11 +96,19 @@ export interface CareerEntry {
 interface PlayerCommon {
   id: string;
   tier: PlayerTier;
-  name: string;
+  firstName: string;
+  lastName: string;
   nationality: string;
   position: Position;
-  preferredFoot: PreferredFoot;
   dateOfBirth: CalendarDate;
+}
+
+export function displayName(player: { firstName: string; lastName: string }): string {
+  const f = player.firstName.trim();
+  const l = player.lastName.trim();
+  if (!f) return l;
+  if (!l) return f;
+  return `${f} ${l}`;
 }
 
 export interface DomesticPlayer extends PlayerCommon {

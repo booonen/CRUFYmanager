@@ -559,7 +559,38 @@
   color: var(--accent);
 }
 
-/* Color pair picker */
+/* Color picker (vertical stack) */
+.color-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.color-stack__preview-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.color-stack__preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.color-stack__chip {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-raised);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.color-stack__chip + .color-stack__chip {
+  margin-left: -10px;
+}
+
+/* (legacy) horizontal pair picker - retained until callers migrate */
 .color-pair {
   display: flex;
   align-items: flex-end;
@@ -807,6 +838,26 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
+}
+
+/* Club logo */
+.club-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+.club-logo--swatches {
+  padding: 0;
+}
+.club-logo--swatches > span {
+  display: inline-block;
+  height: 100%;
 }
 
 /* Inline color swatches for clubs */

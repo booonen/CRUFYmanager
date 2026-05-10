@@ -38,14 +38,18 @@ describe('players store', () => {
       founded: 1900,
       colors: { primary: '#fff', secondary: '#000' },
       stadium: { name: '', capacity: 0 },
+      logoUrl: null,
       finances: { balance: 0 },
       managerId: null,
     });
     const cal = useSavefileStore.getState().savefile!.calendar;
-    const playerId = addDomesticPlayer({ ...newPlayerFormInput(cal, clubId), name: 'Striker' });
+    const playerId = addDomesticPlayer({ ...newPlayerFormInput(cal, clubId), firstName: 'Strikey', lastName: 'McStrike' });
 
     const sf = useSavefileStore.getState().savefile!;
-    expect(sf.players.find((p) => p.id === playerId)?.name).toBe('Striker');
+    const found = sf.players.find((p) => p.id === playerId);
+    if (found?.tier !== 'domestic') throw new Error('expected domestic player');
+    expect(found.firstName).toBe('Strikey');
+    expect(found.lastName).toBe('McStrike');
     const club = sf.clubs.find((c) => c.id === clubId)!;
     expect(club.squadPlayerIds).toContain(playerId);
     expect(club.ovr).toBeGreaterThan(0);
@@ -61,6 +65,7 @@ describe('players store', () => {
       founded: 1900,
       colors: { primary: '#fff', secondary: '#000' },
       stadium: { name: '', capacity: 0 },
+      logoUrl: null,
       finances: { balance: 0 },
       managerId: null,
     });
@@ -71,12 +76,13 @@ describe('players store', () => {
       founded: 1900,
       colors: { primary: '#fff', secondary: '#000' },
       stadium: { name: '', capacity: 0 },
+      logoUrl: null,
       finances: { balance: 0 },
       managerId: null,
     });
-    const pid = addDomesticPlayer({ ...newPlayerFormInput(cal, a), name: 'Mover' });
+    const pid = addDomesticPlayer({ ...newPlayerFormInput(cal, a), firstName: 'Mover', lastName: 'X' });
 
-    updateDomesticPlayer(pid, { ...newPlayerFormInput(cal, b), name: 'Mover' });
+    updateDomesticPlayer(pid, { ...newPlayerFormInput(cal, b), firstName: 'Mover', lastName: 'X' });
 
     const sf = useSavefileStore.getState().savefile!;
     expect(sf.clubs.find((c) => c.id === a)?.squadPlayerIds).not.toContain(pid);
@@ -93,10 +99,11 @@ describe('players store', () => {
       founded: 1900,
       colors: { primary: '#fff', secondary: '#000' },
       stadium: { name: '', capacity: 0 },
+      logoUrl: null,
       finances: { balance: 0 },
       managerId: null,
     });
-    const pid = addDomesticPlayer({ ...newPlayerFormInput(cal, c), name: 'Doomed' });
+    const pid = addDomesticPlayer({ ...newPlayerFormInput(cal, c), firstName: 'Doomed', lastName: 'Lad' });
     useSavefileStore.getState().updateSavefile((sf) => ({
       ...sf,
       nationalTeam: { ...sf.nationalTeam, squadPlayerIds: [pid] },
@@ -113,7 +120,7 @@ describe('players store', () => {
   it('useDomesticPlayers returns only the domestic tier', async () => {
     await withFreshSave();
     const cal = useSavefileStore.getState().savefile!.calendar;
-    addDomesticPlayer({ ...newPlayerFormInput(cal, FREE_AGENTS_CLUB_ID), name: 'Hello' });
+    addDomesticPlayer({ ...newPlayerFormInput(cal, FREE_AGENTS_CLUB_ID), firstName: 'Hello', lastName: 'World' });
     const all = useDomesticPlayers.length; // hook is callable but used here only to import
     expect(useSavefileStore.getState().savefile!.players.length).toBe(1);
     expect(typeof all).toBe('number');

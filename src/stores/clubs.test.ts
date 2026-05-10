@@ -24,13 +24,16 @@ async function withFreshSave() {
   });
 }
 
-const blankClubInput = (overrides: Partial<Parameters<typeof addClub>[0]> = {}) => ({
+const blankClubInput = (
+  overrides: Partial<Parameters<typeof addClub>[0]> = {},
+): Parameters<typeof addClub>[0] => ({
   name: 'Foo FC',
   shortName: 'FOO',
   city: 'Foo',
   founded: 1900,
   colors: { primary: '#ffffff', secondary: '#000000' },
   stadium: { name: 'Foo Park', capacity: 10000 },
+  logoUrl: null,
   finances: { balance: 0 },
   managerId: null,
   ...overrides,

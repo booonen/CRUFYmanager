@@ -7,6 +7,7 @@ import { t } from '../lang';
 import type { Club } from '../domain/club';
 import type { ClubInput } from '../stores/clubs';
 import { useSavefileStore } from '../stores/savefile';
+import { randomColorPair } from '../utils/clubColors';
 
 interface ClubFormModalProps {
   open: boolean;
@@ -24,18 +25,21 @@ interface FormState {
   secondary: string;
   stadiumName: string;
   stadiumCapacity: number;
+  logoUrl: string;
 }
 
 function blankFor(currentSeason: number): FormState {
+  const colors = randomColorPair();
   return {
     name: '',
     shortName: '',
     city: '',
     founded: currentSeason,
-    primary: '#d4a73c',
-    secondary: '#1a1206',
+    primary: colors.primary,
+    secondary: colors.secondary,
     stadiumName: '',
     stadiumCapacity: 20000,
+    logoUrl: '',
   };
 }
 
@@ -49,6 +53,7 @@ function fromClub(c: Club): FormState {
     secondary: c.colors.secondary,
     stadiumName: c.stadium.name,
     stadiumCapacity: c.stadium.capacity,
+    logoUrl: c.logoUrl ?? '',
   };
 }
 
@@ -82,6 +87,7 @@ export function ClubFormModal({ open, initial, onCancel, onSubmit }: ClubFormMod
         founded: form.founded,
         colors: { primary: form.primary, secondary: form.secondary },
         stadium: { name: form.stadiumName.trim(), capacity: form.stadiumCapacity },
+        logoUrl: form.logoUrl.trim() ? form.logoUrl.trim() : null,
         finances: { balance: initial?.finances.balance ?? 0 },
         managerId: initial?.managerId ?? null,
       });
@@ -153,7 +159,21 @@ export function ClubFormModal({ open, initial, onCancel, onSubmit }: ClubFormMod
           onChange={({ primary, secondary }) =>
             setForm((f) => ({ ...f, primary, secondary }))
           }
+          onRandomize={() => {
+            const next = randomColorPair();
+            setForm((f) => ({ ...f, primary: next.primary, secondary: next.secondary }));
+          }}
         />
+        <div className="field" style={{ marginTop: 12 }}>
+          <label className="field__label">{t('clubs.fields.logoUrl')}</label>
+          <input
+            className="input mono"
+            value={form.logoUrl}
+            placeholder="https://..."
+            onChange={(e) => setForm((f) => ({ ...f, logoUrl: e.target.value }))}
+          />
+          <div className="field__hint">{t('clubs.fields.logoUrlHint')}</div>
+        </div>
       </div>
 
       <div className="form-section">

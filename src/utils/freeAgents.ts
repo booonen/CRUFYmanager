@@ -12,6 +12,7 @@ export function makeFreeAgentsClub(): Club {
     founded: 0,
     colors: { primary: '#5c5f73', secondary: '#2a2d3e' },
     stadium: { name: '', capacity: 0 },
+    logoUrl: null,
     managerId: null,
     squadPlayerIds: [],
     ovr: 0,

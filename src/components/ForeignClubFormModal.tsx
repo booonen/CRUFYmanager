@@ -19,6 +19,7 @@ const blank = (leagueId: string, countryName: string): ForeignClubInput => ({
   leagueId,
   countryName,
   ovr: 70,
+  logoUrl: null,
 });
 
 export function ForeignClubFormModal({
@@ -42,6 +43,7 @@ export function ForeignClubFormModal({
           leagueId: initial.leagueId,
           countryName: initial.countryName,
           ovr: initial.ovr,
+          logoUrl: initial.logoUrl,
         });
       } else {
         setForm(blank(fallbackLeague?.id ?? '', fallbackLeague?.countryName ?? ''));

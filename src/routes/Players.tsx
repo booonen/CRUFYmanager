@@ -10,6 +10,7 @@ import { t } from '../lang';
 import {
   PERSONALITY_TAGS,
   POSITIONS,
+  displayName,
   type PersonalityTag,
   type Position,
 } from '../domain/player';
@@ -41,7 +42,7 @@ export function PlayersRoute() {
     if (!calendar) return [];
     const q = search.trim().toLowerCase();
     let result = players.filter((p) => {
-      if (q && !p.name.toLowerCase().includes(q)) return false;
+      if (q && !displayName(p).toLowerCase().includes(q)) return false;
       if (clubFilter && p.clubId !== clubFilter) return false;
       if (posFilter && p.position !== posFilter) return false;
       if (personalityFilter && !p.stats.personalities.includes(personalityFilter)) return false;
@@ -54,7 +55,7 @@ export function PlayersRoute() {
         case 'ovrDesc':
           return b.stats.ovr - a.stats.ovr;
         case 'nameAsc':
-          return a.name.localeCompare(b.name);
+          return displayName(a).localeCompare(displayName(b));
         case 'ageAsc':
           return computeAge(a.dateOfBirth, calendar) - computeAge(b.dateOfBirth, calendar);
         case 'ageDesc':
@@ -186,7 +187,7 @@ export function PlayersRoute() {
                 const club = clubs.find((c) => c.id === p.clubId);
                 return (
                   <tr key={p.id} onClick={() => navigate(`/players/${p.id}`)}>
-                    <td style={{ fontWeight: 500 }}>{p.name}</td>
+                    <td style={{ fontWeight: 500 }}>{displayName(p)}</td>
                     <td>
                       <PositionPill position={p.position} />
                     </td>

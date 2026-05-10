@@ -39,6 +39,7 @@ export interface Club {
   founded: number;
   colors: ClubColors;
   stadium: ClubStadium;
+  logoUrl: string | null;
   managerId: string | null;
   squadPlayerIds: string[];
   ovr: number;

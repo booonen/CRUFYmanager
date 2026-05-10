@@ -17,6 +17,7 @@ export interface ForeignClubInput {
   leagueId: string;
   countryName: string;
   ovr: number;
+  logoUrl: string | null;
 }
 
 export function useForeignWorld(): ForeignWorld | null {
@@ -102,6 +103,7 @@ export function addForeignClub(input: ForeignClubInput): string {
           leagueId: input.leagueId,
           countryName: input.countryName.trim(),
           ovr: input.ovr,
+          logoUrl: input.logoUrl,
         },
       ],
     },
@@ -122,6 +124,7 @@ export function updateForeignClub(id: string, patch: Partial<ForeignClubInput>):
               leagueId: patch.leagueId ?? c.leagueId,
               countryName: patch.countryName?.trim() ?? c.countryName,
               ovr: patch.ovr ?? c.ovr,
+              logoUrl: patch.logoUrl !== undefined ? patch.logoUrl : c.logoUrl,
             }
           : c,
       ),

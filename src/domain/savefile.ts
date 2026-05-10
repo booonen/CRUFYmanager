@@ -9,7 +9,7 @@ import type { OtherMatch } from './otherMatches';
 import type { Player } from './player';
 import type { UserSettings } from './settings';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export interface SavefileMeta {
   schemaVersion: number;

@@ -12,6 +12,7 @@ import { t } from '../lang';
 import {
   GK_GAME_STATS,
   OUTFIELD_GAME_STATS,
+  displayName,
   type DomesticPlayer,
   type GameStat,
 } from '../domain/player';
@@ -89,7 +90,7 @@ export function PlayerDetailRoute() {
   return (
     <>
       <PageHeading
-        title={domestic.name}
+        title={displayName(domestic)}
         sub={`${club?.name ?? '—'} · ${domestic.nationality || '—'}`}
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
@@ -120,7 +121,7 @@ export function PlayerDetailRoute() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <PositionPill position={domestic.position} />
               <span className="mono text-dim" style={{ fontSize: 12 }}>
-                #{domestic.squadNumber ?? '—'} · {age}y · {domestic.preferredFoot}-foot
+                #{domestic.squadNumber ?? '—'} · {age}y
               </span>
             </div>
             <div className="chip-row" style={{ marginTop: 4 }}>
@@ -142,24 +143,18 @@ export function PlayerDetailRoute() {
           ))}
         </div>
 
-        <div className="form-section__heading" style={{ marginTop: 16 }}>
-          {t('players.sections.gkStats')}{' '}
-          {!isGK ? (
-            <span className="text-muted" style={{ fontSize: 11, marginLeft: 6 }}>
-              {t('players.profile.gkOnlyHidden')}
-            </span>
-          ) : null}
-        </div>
-        <div className="form-grid">
-          {GK_GAME_STATS.map((stat) => (
-            <StatBar
-              key={stat}
-              label={STAT_LABELS[stat]}
-              value={domestic.stats[stat]}
-              dim={!isGK}
-            />
-          ))}
-        </div>
+        {isGK ? (
+          <>
+            <div className="form-section__heading" style={{ marginTop: 16 }}>
+              {t('players.sections.gkStats')}
+            </div>
+            <div className="form-grid">
+              {GK_GAME_STATS.map((stat) => (
+                <StatBar key={stat} label={STAT_LABELS[stat]} value={domestic.stats[stat]} />
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
 
       <div className="form-section">
@@ -170,6 +165,7 @@ export function PlayerDetailRoute() {
           <StatBar
             label={t('players.fields.injuryProneness')}
             value={domestic.stats.injuryProneness}
+            inverted
           />
           <StatBar label={t('players.fields.potential')} value={domestic.stats.potential} />
         </div>
@@ -236,7 +232,7 @@ export function PlayerDetailRoute() {
           title={t('players.deleteTitle')}
           confirmLabel={t('players.delete')}
           variant="danger"
-          body={t('players.deleteWarning', { name: domestic.name })}
+          body={t('players.deleteWarning', { name: displayName(domestic) })}
           onCancel={() => setDeleting(false)}
           onConfirm={() => {
             deletePlayer(domestic.id);

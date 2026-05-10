@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { CalendarRoute } from './routes/Calendar';
+import { ClubDetailRoute } from './routes/ClubDetail';
 import { ClubsRoute } from './routes/Clubs';
 import { CompetitionsRoute } from './routes/Competitions';
 import { DashboardRoute } from './routes/Dashboard';
@@ -33,6 +34,7 @@ export function App() {
         <Route path="/calendar" element={<CalendarRoute />} />
         <Route path="/competitions" element={<CompetitionsRoute />} />
         <Route path="/clubs" element={<ClubsRoute />} />
+        <Route path="/clubs/:id" element={<ClubDetailRoute />} />
         <Route path="/players" element={<PlayersRoute />} />
         <Route path="/players/:id" element={<PlayerDetailRoute />} />
         <Route path="/managers" element={<ManagersRoute />} />

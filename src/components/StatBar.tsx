@@ -2,11 +2,13 @@ interface StatBarProps {
   label: string;
   value: number;
   dim?: boolean;
+  /** When true, lower values are graded as "better" (e.g. injury proneness). */
+  inverted?: boolean;
 }
 
-export function StatBar({ label, value, dim }: StatBarProps) {
+export function StatBar({ label, value, dim, inverted }: StatBarProps) {
   const pct = Math.max(0, Math.min(100, value));
-  const tone = colorForValue(pct);
+  const tone = colorForValue(inverted ? 100 - pct : pct);
   return (
     <div className="stat-bar" style={{ opacity: dim ? 0.4 : 1 }}>
       <div className="stat-bar__head">

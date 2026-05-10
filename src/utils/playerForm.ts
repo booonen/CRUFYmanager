@@ -4,17 +4,16 @@ import type {
   GameStatBlock,
   PersonalityTag,
   Position,
-  PreferredFoot,
 } from '../domain/player';
 import { dobForAge } from './age';
 import { computeOvr, defaultStatBlock } from './ovr';
 import { newId } from './ids';
 
 export interface PlayerFormInput {
-  name: string;
+  firstName: string;
+  lastName: string;
   nationality: string;
   position: Position;
-  preferredFoot: PreferredFoot;
   age: number;
   clubId: string;
   contractUntilSeason: number;
@@ -40,10 +39,10 @@ export function newPlayerFormInput(
   defaults: NewPlayerDefaults = {},
 ): PlayerFormInput {
   return {
-    name: '',
+    firstName: '',
+    lastName: '',
     nationality: defaults.nationality ?? '',
     position: 'MID-CM',
-    preferredFoot: 'R',
     age: 22,
     clubId,
     contractUntilSeason: calendar.currentSeason + 3,
@@ -64,10 +63,10 @@ export function playerFormToDomain(input: PlayerFormInput, calendar: Calendar): 
   return {
     id: newId(),
     tier: 'domestic',
-    name: input.name.trim(),
+    firstName: input.firstName.trim(),
+    lastName: input.lastName.trim(),
     nationality: input.nationality.trim(),
     position: input.position,
-    preferredFoot: input.preferredFoot,
     dateOfBirth: dobForAge(input.age, calendar),
     stats: {
       ...input.stats,
@@ -111,10 +110,10 @@ export function domesticPlayerToFormInput(
   const seasonsElapsed = calendar.currentSeason - player.dateOfBirth.season;
   const passedBirthMatchday = calendar.currentMatchday >= player.dateOfBirth.matchday;
   return {
-    name: player.name,
+    firstName: player.firstName,
+    lastName: player.lastName,
     nationality: player.nationality,
     position: player.position,
-    preferredFoot: player.preferredFoot,
     age: Math.max(0, seasonsElapsed - (passedBirthMatchday ? 0 : 1)),
     clubId: player.clubId,
     contractUntilSeason: player.contractUntilSeason,
