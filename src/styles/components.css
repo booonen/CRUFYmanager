@@ -827,6 +827,18 @@
 .data-table tbody tr {
   cursor: pointer;
 }
+.data-table tbody tr.data-table__group {
+  cursor: default;
+  background: transparent;
+}
+.data-table tbody tr.data-table__group:hover {
+  background: transparent;
+}
+.data-table tbody tr.data-table__group td {
+  padding: 12px 10px 4px;
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+  letter-spacing: 0.6px;
+}
 
 /* Form section */
 .form-section {

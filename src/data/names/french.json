@@ -1,0 +1,42 @@
+{
+  "code": "french",
+  "displayName": "French",
+  "notes": "French-speaking footballer names; covers France, Belgium (FR), Quebec.",
+  "firstNames": [
+    "Lucas", "Hugo", "Léo", "Louis", "Raphaël", "Arthur", "Adam", "Jules", "Maël", "Gabriel",
+    "Nathan", "Tom", "Théo", "Antoine", "Paul", "Mathis", "Ethan", "Noah", "Liam", "Sacha",
+    "Antoine", "Pierre", "Jean", "Julien", "Florian", "Romain", "Mathieu", "Nicolas", "Maxime", "Quentin",
+    "Olivier", "Thierry", "Bernard", "François", "Patrick", "Christophe", "Stéphane", "Laurent", "David", "Frédéric",
+    "Kylian", "Karim", "Olivier", "Thomas", "Antoine", "Hugo", "Paul", "Florian", "Adrien", "Marcus",
+    "Anthony", "Bruno", "Cédric", "Damien", "Étienne", "Fabien", "Geoffrey", "Henri", "Idriss", "Jérémy",
+    "Kevin", "Loïc", "Maxence", "Nolan", "Octave", "Pascal", "Rémi", "Sébastien", "Tristan", "Ugo",
+    "Valentin", "William", "Xavier", "Yannis", "Zacharie", "Aurélien", "Bastien", "Côme", "Dorian", "Émile",
+    "Gaël", "Hervé", "Iliès", "Joffrey", "Killian", "Léonard", "Marin", "Nathan", "Owen", "Paco"
+  ],
+  "lastNames": [
+    "Martin", "Bernard", "Thomas", "Petit", "Robert", "Richard", "Durand", "Dubois", "Moreau", "Laurent",
+    "Simon", "Michel", "Lefèvre", "Leroy", "Roux", "David", "Bertrand", "Morel", "Fournier", "Girard",
+    "Bonnet", "Dupont", "Lambert", "Fontaine", "Rousseau", "Vincent", "Müller", "Lefebvre", "Mercier", "Dupuis",
+    "Lemoine", "André", "Mathieu", "Garnier", "Faure", "Rousseau", "Blanc", "Guérin", "Muller", "Henry",
+    "Roussel", "Nicolas", "Perrin", "Morin", "Mathieu", "Clément", "Gauthier", "Dumont", "Lopez", "Fontaine",
+    "Chevalier", "Robin", "Masson", "Sanchez", "Gérard", "Nguyen", "Boyer", "Denis", "Lemaire", "Duval",
+    "Joly", "Gautier", "Roger", "Roche", "Roy", "Noël", "Meyer", "Lucas", "Meunier", "Jean",
+    "Perez", "Marchand", "Dufour", "Blanchard", "Marie", "Barbier", "Brun", "Dumas", "Brunet", "Schmitt",
+    "Carpentier", "Olivier", "Riou", "Fernandez", "Hubert", "Renard", "Rivière", "Chevalier", "Lacroix", "Carlier"
+  ],
+  "cities": [
+    "Paris", "Marseille", "Lyon", "Toulouse", "Nice", "Nantes", "Strasbourg", "Montpellier", "Bordeaux", "Lille",
+    "Rennes", "Reims", "Toulon", "Saint-Étienne", "Le Havre", "Grenoble", "Dijon", "Angers", "Nîmes", "Villeurbanne",
+    "Clermont", "Aix", "Brest", "Limoges", "Tours", "Amiens", "Perpignan", "Metz", "Besançon", "Orléans",
+    "Caen", "Mulhouse", "Rouen", "Nancy", "Avignon"
+  ],
+  "clubTemplates": [
+    "{city} FC",
+    "FC {city}",
+    "AS {city}",
+    "Olympique {city}",
+    "Stade {city}",
+    "Racing {city}",
+    "AJ {city}"
+  ]
+}

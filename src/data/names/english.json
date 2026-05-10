@@ -1,0 +1,44 @@
+{
+  "code": "english",
+  "displayName": "English",
+  "notes": "Common English-speaking footballer names; bias toward British / Irish / commonwealth.",
+  "firstNames": [
+    "Jack", "Harry", "James", "Oliver", "Thomas", "Charlie", "George", "Noah", "Henry", "Oscar",
+    "Leo", "Archie", "Theo", "Jacob", "William", "Joseph", "Alfie", "Daniel", "Samuel", "Ethan",
+    "Lewis", "Mason", "Logan", "Isaac", "Arthur", "Edward", "Finley", "Harrison", "Sebastian", "Dylan",
+    "Reggie", "Albie", "Frankie", "Tommy", "Stanley", "Riley", "Jaxon", "Hugo", "Felix", "Max",
+    "Adam", "Connor", "Luca", "Toby", "Joshua", "Liam", "Tyler", "Ben", "Ronnie", "Hudson",
+    "Jude", "Reuben", "Caleb", "Bobby", "Kai", "Jesse", "Aaron", "Owen", "Callum", "Ross",
+    "Andrew", "Michael", "Christopher", "Anthony", "Nicholas", "David", "Patrick", "Sean", "Stephen", "Matthew",
+    "Aiden", "Cameron", "Cole", "Declan", "Eli", "Finn", "Gabriel", "Jaden", "Jordan", "Marcus",
+    "Nathan", "Quinn", "Ray", "Scott", "Trent", "Vincent", "Wyatt", "Zachary", "Ashton", "Brody"
+  ],
+  "lastNames": [
+    "Smith", "Jones", "Taylor", "Brown", "Williams", "Wilson", "Johnson", "Davies", "Robinson", "Wright",
+    "Thompson", "Evans", "Walker", "White", "Roberts", "Green", "Hall", "Wood", "Jackson", "Clarke",
+    "Harris", "Edwards", "Hughes", "Lewis", "Turner", "Martin", "Cooper", "Hill", "Ward", "Morris",
+    "Moore", "Clark", "Lee", "King", "Baker", "Harrison", "Morgan", "Allen", "James", "Scott",
+    "Phillips", "Watson", "Davis", "Parker", "Price", "Bennett", "Young", "Griffiths", "Mitchell", "Kelly",
+    "Cook", "Carter", "Richardson", "Bailey", "Collins", "Bell", "Shaw", "Murphy", "Foster", "Palmer",
+    "Russell", "Marshall", "Ellis", "Grant", "Burton", "Stevens", "Lambert", "Knight", "Sutton", "Pearce",
+    "Howard", "Page", "Powell", "Reid", "Sharp", "Stone", "Reed", "Saunders", "Atkinson", "Holt",
+    "Doyle", "O'Brien", "Murray", "Quinn", "Ryan", "Walsh", "Connor", "Fitzgerald", "Brennan", "Sullivan",
+    "Whitfield", "Hartley", "Bramley", "Eastwood", "Goodwin", "Farr", "Holland", "Kemp", "Lockwood", "Norton"
+  ],
+  "cities": [
+    "Manchester", "Birmingham", "Liverpool", "Leeds", "Sheffield", "Bristol", "Newcastle", "Nottingham", "Leicester", "Coventry",
+    "Hull", "Stoke", "Wolverhampton", "Plymouth", "Derby", "Southampton", "Portsmouth", "Brighton", "Preston", "Sunderland",
+    "Norwich", "Oxford", "Cambridge", "Reading", "Luton", "Watford", "Bournemouth", "Swansea", "Cardiff", "Edinburgh",
+    "Glasgow", "Aberdeen", "Dundee", "Belfast", "Dublin", "Cork", "Galway", "York", "Lancaster", "Exeter"
+  ],
+  "clubTemplates": [
+    "{city} FC",
+    "{city} United",
+    "{city} City",
+    "{city} Town",
+    "AFC {city}",
+    "{city} Wanderers",
+    "{city} Athletic",
+    "Real {city}"
+  ]
+}

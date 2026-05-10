@@ -1,0 +1,42 @@
+{
+  "code": "arabic",
+  "displayName": "Arabic",
+  "notes": "Pan-Arabic pool: mixes names common across Egypt, Morocco, Algeria, Saudi Arabia, Jordan, Iraq, Lebanon, Tunisia.",
+  "firstNames": [
+    "Mohammed", "Ahmed", "Mahmoud", "Ali", "Hassan", "Hussein", "Omar", "Khalid", "Ibrahim", "Yousef",
+    "Mostafa", "Mohamed", "Karim", "Tariq", "Sami", "Walid", "Adil", "Yassin", "Hicham", "Rachid",
+    "Anas", "Bilal", "Fahd", "Ghassan", "Hamza", "Issam", "Jamal", "Khaled", "Loay", "Marwan",
+    "Nabil", "Othman", "Qasim", "Ramzi", "Samir", "Tawfik", "Usama", "Wassim", "Yahya", "Zaki",
+    "Salah", "Riad", "Mohcine", "Younes", "Ayoub", "Reda", "Adam", "Iyad", "Bassem", "Hicham",
+    "Achraf", "Sofiane", "Ramy", "Naji", "Faisal", "Saleh", "Saud", "Bandar", "Sultan", "Majed",
+    "Abdulrahman", "Abdulaziz", "Abdullah", "Abdelkader", "Abdelhamid", "Abdellatif", "Mohcine", "Anouar", "Rayan", "Saif",
+    "Adnan", "Akram", "Amir", "Asif", "Bashar", "Charif", "Dawud", "Elias", "Faris", "Ghazi",
+    "Hadi", "Imad", "Jad", "Kareem", "Layth", "Mounir", "Nadim", "Oussama", "Qutaiba", "Rami"
+  ],
+  "lastNames": [
+    "Al-Ahmad", "Al-Hassan", "Al-Hussein", "Al-Khalifa", "Al-Saud", "Al-Sayed", "Al-Sharif", "Al-Hashemi", "El-Masri", "El-Sayed",
+    "Hassan", "Mahmoud", "Mohamed", "Ahmed", "Ibrahim", "Mostafa", "Mansour", "Khalil", "Salim", "Said",
+    "Bouhia", "Bouchard", "Bouzid", "Belkacem", "Mansouri", "Bouchakour", "Belhadj", "Khelifi", "Boutaleb", "Madani",
+    "Ben Youssef", "Ben Ali", "Ben Hassan", "Ben Mohamed", "Ben Ahmed", "Ben Salah", "Ben Omar", "Ben Khaled", "Ben Issa", "Ben Tahar",
+    "Salah", "Trezeguet", "Hegazy", "Elneny", "Ramadan", "Sobhi", "Warda", "Hamed", "Mohsen", "Fathi",
+    "Ziyech", "Hakimi", "En-Nesyri", "Boufal", "Chairi", "Nakach", "Diaz", "Mazraoui", "Ait Bennassser", "Saiss",
+    "Mahrez", "Bennacer", "Bouguerra", "Slimani", "Brahimi", "Belaili", "Feghouli", "Mandi", "Bensebaini", "Atal",
+    "Khazri", "Skhiri", "Sliti", "Maaloul", "Talbi", "Chaalali", "Drager", "Kechrida", "Meriah", "Naghmouchi",
+    "Najjar", "Hariri", "Tlass", "Atassi", "Khoury", "Saleh", "Awad", "Daoud", "Faraj", "Ghazi"
+  ],
+  "cities": [
+    "Cairo", "Alexandria", "Giza", "Casablanca", "Rabat", "Marrakech", "Tunis", "Sfax", "Algiers", "Oran",
+    "Tripoli", "Benghazi", "Beirut", "Damascus", "Aleppo", "Amman", "Baghdad", "Basra", "Riyadh", "Jeddah",
+    "Mecca", "Medina", "Doha", "Dubai", "Abu Dhabi", "Manama", "Kuwait City", "Muscat", "Sana'a", "Khartoum"
+  ],
+  "clubTemplates": [
+    "Al-{city}",
+    "{city} SC",
+    "{city} FC",
+    "Al-Ahly {city}",
+    "Al-Ittihad {city}",
+    "{city} United",
+    "Olympic {city}",
+    "Etoile {city}"
+  ]
+}

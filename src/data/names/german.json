@@ -1,0 +1,43 @@
+{
+  "code": "german",
+  "displayName": "German",
+  "notes": "German-speaking footballer names; covers Germany, Austria, German-speaking Switzerland.",
+  "firstNames": [
+    "Lukas", "Leon", "Felix", "Maximilian", "Paul", "Noah", "Elias", "Jonas", "Ben", "Finn",
+    "Luis", "Tim", "Jannik", "Tom", "Niklas", "David", "Moritz", "Jan", "Florian", "Julian",
+    "Marco", "Sebastian", "Stefan", "Andreas", "Michael", "Christian", "Markus", "Daniel", "Thomas", "Simon",
+    "Manuel", "Bernd", "Klaus", "Hans", "Peter", "Frank", "Dieter", "Werner", "Jürgen", "Holger",
+    "Toni", "Joshua", "Ilkay", "Mats", "Mesut", "Robin", "Marc", "Kevin", "Sven", "Torsten",
+    "Patrick", "Roland", "Heinrich", "Wilhelm", "Friedrich", "Karl", "Ludwig", "Otto", "Reiner", "Volker",
+    "Bastian", "Mario", "Pascal", "Yannick", "Erik", "Henrik", "Konrad", "Lennart", "Mathis", "Oskar",
+    "Philipp", "Quirin", "Raphael", "Samuel", "Theo", "Valentin", "Aaron", "Alexander", "Anton", "Benedikt",
+    "Dennis", "Emil", "Friedrich", "Gabriel", "Hannes", "Ivo", "Joel", "Kilian", "Linus", "Magnus"
+  ],
+  "lastNames": [
+    "Müller", "Schmidt", "Schneider", "Fischer", "Weber", "Meyer", "Wagner", "Becker", "Schulz", "Hoffmann",
+    "Schäfer", "Koch", "Bauer", "Richter", "Klein", "Wolf", "Schröder", "Neumann", "Schwarz", "Zimmermann",
+    "Braun", "Krüger", "Hofmann", "Hartmann", "Lange", "Schmitt", "Werner", "Krause", "Lehmann", "Schmid",
+    "Köhler", "Herrmann", "König", "Walter", "Mayer", "Huber", "Kaiser", "Fuchs", "Peters", "Lang",
+    "Scholz", "Möller", "Weiß", "Jung", "Hahn", "Schubert", "Vogel", "Friedrich", "Keller", "Günther",
+    "Frank", "Berger", "Winkler", "Roth", "Beck", "Lorenz", "Baumann", "Franke", "Albrecht", "Schuster",
+    "Simon", "Ludwig", "Böhm", "Winter", "Kraus", "Martin", "Schumacher", "Krämer", "Vogt", "Stein",
+    "Jäger", "Otto", "Sommer", "Groß", "Seidel", "Heinrich", "Brandt", "Haas", "Schreiber", "Graf",
+    "Reichert", "Reinhardt", "Brückner", "Engel", "Kühn", "Förster", "Adler", "Riedel", "Mahler", "Steinbach"
+  ],
+  "cities": [
+    "München", "Berlin", "Hamburg", "Köln", "Frankfurt", "Stuttgart", "Dortmund", "Düsseldorf", "Leipzig", "Bremen",
+    "Hannover", "Nürnberg", "Dresden", "Bochum", "Wuppertal", "Bielefeld", "Bonn", "Mannheim", "Karlsruhe", "Augsburg",
+    "Mainz", "Wiesbaden", "Mönchengladbach", "Gelsenkirchen", "Münster", "Aachen", "Braunschweig", "Kiel", "Freiburg", "Erfurt",
+    "Wien", "Graz", "Salzburg", "Linz", "Zürich", "Basel", "Bern"
+  ],
+  "clubTemplates": [
+    "FC {city}",
+    "{city} 1900",
+    "SV {city}",
+    "TSV {city}",
+    "Borussia {city}",
+    "VfB {city}",
+    "Eintracht {city}",
+    "Hertha {city}"
+  ]
+}

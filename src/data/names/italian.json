@@ -1,0 +1,43 @@
+{
+  "code": "italian",
+  "displayName": "Italian",
+  "notes": "Italian footballer names.",
+  "firstNames": [
+    "Lorenzo", "Marco", "Alessandro", "Andrea", "Francesco", "Matteo", "Luca", "Davide", "Riccardo", "Federico",
+    "Giovanni", "Antonio", "Stefano", "Roberto", "Paolo", "Pietro", "Fabio", "Massimo", "Daniele", "Alberto",
+    "Nicola", "Simone", "Filippo", "Tommaso", "Edoardo", "Gabriele", "Leonardo", "Mattia", "Samuele", "Cristian",
+    "Salvatore", "Mario", "Vincenzo", "Giuseppe", "Carlo", "Bruno", "Sergio", "Dario", "Sandro", "Maurizio",
+    "Enrico", "Claudio", "Giorgio", "Luigi", "Domenico", "Ettore", "Federico", "Gennaro", "Ivan", "Lorenzo",
+    "Mirko", "Nazareno", "Ottavio", "Patrizio", "Quirino", "Renato", "Settimio", "Tiziano", "Ugo", "Valerio",
+    "Walter", "Yari", "Zeno", "Aurelio", "Beppe", "Ciro", "Diego", "Emiliano", "Fausto", "Gabriele",
+    "Hagi", "Ivano", "Jacopo", "Kalamandrei", "Lapo", "Manlio", "Niccolò", "Orazio", "Piero", "Rocco",
+    "Severino", "Tito", "Umberto", "Vito", "Wladimiro", "Yago", "Zanardo", "Alessio", "Brando", "Camillo"
+  ],
+  "lastNames": [
+    "Rossi", "Ferrari", "Russo", "Bianchi", "Romano", "Colombo", "Ricci", "Marino", "Greco", "Bruno",
+    "Gallo", "Conti", "De Luca", "Mancini", "Costa", "Giordano", "Rizzo", "Lombardi", "Moretti", "Barbieri",
+    "Fontana", "Santoro", "Mariani", "Rinaldi", "Caruso", "Ferrara", "Galli", "Martini", "Leone", "Longo",
+    "Gentile", "Martinelli", "Vitale", "Lombardo", "Serra", "Coppola", "De Santis", "D'Angelo", "Marchetti", "Parisi",
+    "Villa", "Conte", "Ferraro", "Ferri", "Fabbri", "Bianco", "Marini", "Grimaldi", "Pellegrini", "Sartori",
+    "Cattaneo", "Negri", "Riva", "Esposito", "Caputo", "Donati", "Ferretti", "Sala", "Rossetti", "Belli",
+    "Orlando", "Ruggiero", "Monti", "Battaglia", "Sanna", "Farina", "De Angelis", "Damiani", "Damico", "Marchesi",
+    "Mazza", "Pace", "Rizzi", "Saccone", "Tedesco", "Vigano", "Zanetti", "Amato", "Basile", "Caputi",
+    "Cosentino", "Damore", "Esposti", "Fiore", "Galante", "Iannone", "Lauro", "Manzoni", "Nardi", "Olivieri"
+  ],
+  "cities": [
+    "Roma", "Milano", "Napoli", "Torino", "Palermo", "Genova", "Bologna", "Firenze", "Bari", "Catania",
+    "Verona", "Venezia", "Messina", "Padova", "Trieste", "Brescia", "Parma", "Taranto", "Prato", "Modena",
+    "Reggio Calabria", "Cagliari", "Livorno", "Foggia", "Salerno", "Perugia", "Ravenna", "Sassari", "Bergamo", "Vicenza",
+    "Udine", "Pescara", "Catanzaro", "Ancona", "Cesena", "Latina"
+  ],
+  "clubTemplates": [
+    "AC {city}",
+    "{city} Calcio",
+    "AS {city}",
+    "FC {city}",
+    "Internazionale {city}",
+    "Juventus {city}",
+    "{city} 1908",
+    "Lazio {city}"
+  ]
+}

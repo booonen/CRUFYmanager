@@ -6,6 +6,7 @@ import { ClubDetailRoute } from './routes/ClubDetail';
 import { ClubsRoute } from './routes/Clubs';
 import { CompetitionsRoute } from './routes/Competitions';
 import { DashboardRoute } from './routes/Dashboard';
+import { GeneratorRoute } from './routes/Generator';
 import { HistoryRoute } from './routes/History';
 import { IssuesRoute } from './routes/Issues';
 import { ManagersRoute } from './routes/Managers';
@@ -33,6 +34,7 @@ export function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardRoute />} />
         <Route path="/issues" element={<IssuesRoute />} />
+        <Route path="/generator" element={<GeneratorRoute />} />
         <Route path="/calendar" element={<CalendarRoute />} />
         <Route path="/competitions" element={<CompetitionsRoute />} />
         <Route path="/clubs" element={<ClubsRoute />} />

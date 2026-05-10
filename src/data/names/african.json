@@ -1,0 +1,43 @@
+{
+  "code": "african",
+  "displayName": "African",
+  "notes": "Macro Sub-Saharan African pool: mixes Yoruba/Igbo (Nigeria), Akan (Ghana), Bantu (East/South), Wolof (Senegal), and others. Plausibly-African rather than ethnographically precise.",
+  "firstNames": [
+    "Kwame", "Kofi", "Yaw", "Kwesi", "Akwasi", "Kojo", "Nana", "Kweku", "Kwaku", "Yao",
+    "Chinedu", "Emeka", "Obi", "Chinonso", "Tobenna", "Ifeanyi", "Uche", "Chibueze", "Chukwuma", "Ikenna",
+    "Adeola", "Adekunle", "Olumide", "Babatunde", "Ayodeji", "Olusegun", "Akin", "Tunde", "Femi", "Wale",
+    "Mamadou", "Ousmane", "Cheikh", "Ibrahima", "Demba", "Modou", "Pape", "Aliou", "Idrissa", "Bakary",
+    "Sadio", "Mohamed", "Khalifa", "Souleymane", "Lamine", "Saliou", "Babacar", "Pape", "Moussa", "Boubacar",
+    "Tendai", "Tafadzwa", "Tinashe", "Munyaradzi", "Tatenda", "Farai", "Brian", "Peter", "Joshua", "Daniel",
+    "Sipho", "Themba", "Bongani", "Sibusiso", "Lwazi", "Andile", "Nkosinathi", "Mandla", "Lungelo", "Sandile",
+    "Joseph", "Samuel", "Michael", "David", "John", "James", "Paul", "Stephen", "Patrick", "Anthony",
+    "Mbappé", "Kalidou", "Édouard", "Habib", "Abdou", "Salif", "Ismael", "Yaya", "Didier", "Toussaint"
+  ],
+  "lastNames": [
+    "Adeyemi", "Adebayor", "Olatunji", "Okonkwo", "Okoro", "Eze", "Nwankwo", "Obi", "Mensah", "Asante",
+    "Boateng", "Ofori", "Owusu", "Adjei", "Yeboah", "Frimpong", "Acheampong", "Annan", "Sarpong", "Appiah",
+    "Diallo", "Diop", "Ndiaye", "Sall", "Cissé", "Sow", "Bâ", "Faye", "Touré", "Sané",
+    "Diatta", "Niang", "Gueye", "Camara", "Sarr", "Konaté", "Coulibaly", "Traoré", "Konate", "Dembele",
+    "Moyo", "Ncube", "Nyathi", "Sibanda", "Mpofu", "Khumalo", "Mavhunga", "Chiwenga", "Chinyanga", "Mlambo",
+    "Mokoena", "Khoza", "Nkomo", "Zwane", "Dlamini", "Ngcobo", "Mthembu", "Mhlongo", "Khumalo", "Maseko",
+    "Wanyama", "Otieno", "Ochieng", "Mwangi", "Kamau", "Njoroge", "Kiplagat", "Kipchoge", "Mutua", "Kariuki",
+    "Mbuyi", "Kabongo", "Mbemba", "Tshibangu", "Kasongo", "Lukaku", "Tshisekedi", "Mfumu", "Nzuzi", "Ekambi",
+    "Aboubakar", "Onana", "Eto'o", "Anguissa", "Ngadeu", "Choupo", "Bahoken", "Banana", "Kemen", "Tolo"
+  ],
+  "cities": [
+    "Lagos", "Abuja", "Accra", "Kumasi", "Dakar", "Abidjan", "Nairobi", "Mombasa", "Kampala", "Dar es Salaam",
+    "Addis Ababa", "Lusaka", "Harare", "Bulawayo", "Johannesburg", "Cape Town", "Durban", "Pretoria", "Maputo", "Luanda",
+    "Kinshasa", "Lubumbashi", "Brazzaville", "Yaoundé", "Douala", "Bamako", "Ouagadougou", "Niamey", "Cotonou", "Lomé",
+    "Conakry", "Freetown", "Monrovia", "Antananarivo", "Windhoek"
+  ],
+  "clubTemplates": [
+    "{city} FC",
+    "AS {city}",
+    "{city} United",
+    "{city} City",
+    "Club {city}",
+    "Real {city}",
+    "{city} Sports",
+    "{city} Stars"
+  ]
+}
