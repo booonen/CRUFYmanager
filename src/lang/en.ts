@@ -20,7 +20,7 @@ export const en = {
     history: 'History',
     section_world: 'Beyond',
     world: 'World',
-    section_save: 'Save',
+    section_system: 'System',
     saves: 'Saves',
   },
   dashboard: {

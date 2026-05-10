@@ -18,10 +18,7 @@ interface NavGroup {
 const NAV: NavGroup[] = [
   {
     headingKey: 'nav.section_overview',
-    items: [
-      { to: '/dashboard', labelKey: 'nav.dashboard', icon: '◈' },
-      { to: '/issues', labelKey: 'nav.issues', icon: '◭', badge: 'issues' },
-    ],
+    items: [{ to: '/dashboard', labelKey: 'nav.dashboard', icon: '◈' }],
   },
   {
     headingKey: 'nav.section_main',
@@ -49,8 +46,11 @@ const NAV: NavGroup[] = [
     items: [{ to: '/world', labelKey: 'nav.world', icon: '◌' }],
   },
   {
-    headingKey: 'nav.section_save',
-    items: [{ to: '/saves', labelKey: 'nav.saves', icon: '◉' }],
+    headingKey: 'nav.section_system',
+    items: [
+      { to: '/issues', labelKey: 'nav.issues', icon: '◭', badge: 'issues' },
+      { to: '/saves', labelKey: 'nav.saves', icon: '◉' },
+    ],
   },
 ];
 

@@ -653,3 +653,45 @@ Phase 0 design proposal: [`docs/phases/phase-0.md`](docs/phases/phase-0.md).
 - §3.5–3.7 — manager stat list, club founding semantics, national team field minimums. Lock down in Phase 1 (managers/clubs) and Phase 6 (NT).
 - Cross-savefile id re-keying on import: not needed in Phase 0 (saves are empty). Implement when Phase 1 starts producing real entity ids.
 - §8 open questions (name pools, relegation playoffs, transfer economy, report templates, multi-sport abstractions) — untouched, as designed.
+
+### Phase 1 — shipped 2026-05-10 (PR #5)
+
+Phase 1 design proposal: [`docs/phases/phase-1.md`](docs/phases/phase-1.md).
+
+**Locked (schema):**
+- **Game stats: 9 outfield + 3 GK-only** (12 per player). Outfield: pace, finishing, passing, dribbling, defending, heading, vision, physicality, technique. GK-only: handling, reflexes, kicking. The 3 GK stats are stored on every player but only contribute to OVR for `position === 'GK'`.
+- **Personality tags: 12** (Professional, Mercurial, Loyal, Ambitious, Hothead, Leader, Quiet, Showboat, Selfish, Dedicated, Casual, Influential). Each player carries **1–3** personalities.
+- **Positions: 12** — `GK · DEF-CB · DEF-LB · DEF-RB · MID-CDM · MID-CM · MID-CAM · MID-LM · MID-RM · FWD-LW · FWD-RW · FWD-ST`. Single primary position per player. **Alt-position preference matrix is deferred to Phase 4.**
+- **OVR formula**: per-position weight matrix (12 × 12) in `src/utils/ovr.ts`. Tunable; the engine uses raw stats.
+- **Player name** is now `firstName` + `lastName` (not a single `name` string).
+- **`Player.preferredFoot` removed** (was in the original §3.2 plan; we dropped it as redundant for the sim).
+- **`Club.kind`** discriminator added; **Free Agents** is a reserved synthetic club (id `__free_agents__`) and the default state for any unassigned domestic player.
+- **`Club.logoUrl`**, **`ForeignClub.logoUrl`**, **`ForeignNT.flagUrl`** added (optional URLs to image assets). Foreign-NT flag UI lands in Phase 6.
+- **Manager stats**: plan's 5 (tactical / motivation / development / discipline / adaptability).
+
+**Locked (UX patterns):**
+- **No native dialogs** anywhere — modal-based confirms only.
+- **Number inputs commit on blur / Enter**, not on every keystroke (`<NumberInput>` shared component).
+- **List → profile route** for clubs (`/clubs/:id`) and players (`/players/:id`); managers stay as inline list rows for now.
+- **Squad rows clickable** in the club detail page → navigate to the player profile.
+- **Random kit-color palette** pre-fills new clubs from a curated list; "Randomize" rerolls.
+- **Color picker** stacks vertically (primary above secondary).
+- **OVR badges + StatBar use a 7-tier graded color scale** (deep green ≥ 85 down to dark red < 35).
+- **Inverted color scale** on injury proneness — low values are graded as the "good" green tones.
+- **Sidebar layout**: "Overview" (Dashboard), "World" (Calendar / Competitions / Clubs / Players / Managers), "Country" (National Team / Other Matches), "Records" (History), "Beyond" (World), "System" (Issues / Saves).
+- **Issues** is a dedicated sidebar route with a count badge — coverage warnings live there, not on the Dashboard.
+- **Nationality defaults to the savefile's country name** in player and manager forms.
+
+**Schema versioning policy (set during Phase 1 review):**
+- We do **not** ship a migration for every in-development schema change. While CRUFY is in active development, in-flight saves are disposable; schema changes mutate the v1 baseline. The migration system stays in place so the first publicly-shipped breaking change can register a real migration.
+- `SCHEMA_VERSION` was reset to `1` after collapsing four in-development migrations (v1→v2 club kind / Free Agents; v2→v3 personality array; v3→v4 name split + foot drop + logoUrl/flagUrl).
+
+**Deferred to later phases:**
+- **Procedural generation** (player generator, squad generator, manager generator, league generator, name pools) — Phase 2.
+- **Bulk-create** (e.g. "create 25 players for this club") — Phase 2.
+- **Stat fuzzification / randomize button on the player form** — Phase 2.
+- **Foreign-resident** and **foreign-NT-stub** players — Phase 6 (their semantics tie to NT registration).
+- **Club balance UI** — Phase 7 (transfers). Schema field stays.
+- **Alt-position preference matrix** — Phase 4 (lineup selection).
+- **Stats progression / aging across seasons** — Phase 4/5 (sim engine + season turnover).
+- **Stats-influence-on-match-results** — Phase 4 (the entire sim engine's reason for being).

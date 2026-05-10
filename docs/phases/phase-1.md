@@ -1,6 +1,7 @@
 # Phase 1 Design Proposal — Static Entity Management
 
-> **Status:** awaiting user sign-off. No code yet.
+> **Status:** shipped. Phase 1 acceptance gate met on 2026-05-10. Merged to `main` via PR #5.
+> Two rounds of post-ship polish included in the same PR (player profile route, multi-personality, 7-tier OVR, NumberInput; then `/clubs/:id` profile, club logos, random kit-color palette, vertical color picker, GK-only-stat hiding, inverted injury-proneness scale, sidebar Issues tab, schema reset to v1).
 
 Companion to `CRUFY_PLAN_1.md`. Per the plan workflow, this restates Phase 1 goals, lists every concrete decision I plan to make, flags overrides/extensions of the plan, and ends with a question round.
 
