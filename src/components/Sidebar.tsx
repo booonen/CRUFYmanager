@@ -25,6 +25,7 @@ const NAV: NavGroup[] = [
       { to: '/competitions', labelKey: 'nav.competitions', icon: '◇' },
       { to: '/clubs', labelKey: 'nav.clubs', icon: '◎' },
       { to: '/players', labelKey: 'nav.players', icon: '◐' },
+      { to: '/managers', labelKey: 'nav.managers', icon: '◑' },
     ],
   },
   {

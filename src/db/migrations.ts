@@ -1,9 +1,24 @@
 import type { Savefile } from '../domain/savefile';
 import { SCHEMA_VERSION } from '../domain/savefile';
+import { ensureFreeAgentsClub } from '../utils/freeAgents';
+import type { Club } from '../domain/club';
 
 export type Migration = (savefile: Savefile) => Savefile;
 
-const migrations: Record<number, Migration> = {};
+const migrations: Record<number, Migration> = {
+  1: (sf) => {
+    const clubs: Club[] = sf.clubs.map((c) => ({
+      ...c,
+      kind: c.kind ?? 'club',
+    }));
+    const next: Savefile = {
+      ...sf,
+      clubs,
+      meta: { ...sf.meta, schemaVersion: 2 },
+    };
+    return ensureFreeAgentsClub(next);
+  },
+};
 
 export function migrate(savefile: Savefile): Savefile {
   let current = savefile;

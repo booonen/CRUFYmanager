@@ -26,8 +26,13 @@ export interface ClubSeasonRecord {
   trophy: 'winner' | 'runner-up' | null;
 }
 
+export type ClubKind = 'club' | 'free-agents';
+
+export const FREE_AGENTS_CLUB_ID = '__free_agents__';
+
 export interface Club {
   id: string;
+  kind: ClubKind;
   name: string;
   shortName: string;
   city: string;

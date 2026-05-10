@@ -6,6 +6,7 @@ import { ClubsRoute } from './routes/Clubs';
 import { CompetitionsRoute } from './routes/Competitions';
 import { DashboardRoute } from './routes/Dashboard';
 import { HistoryRoute } from './routes/History';
+import { ManagersRoute } from './routes/Managers';
 import { NationalTeamRoute } from './routes/NationalTeam';
 import { OtherMatchesRoute } from './routes/OtherMatches';
 import { PlayersRoute } from './routes/Players';
@@ -32,6 +33,7 @@ export function App() {
         <Route path="/competitions" element={<CompetitionsRoute />} />
         <Route path="/clubs" element={<ClubsRoute />} />
         <Route path="/players" element={<PlayersRoute />} />
+        <Route path="/managers" element={<ManagersRoute />} />
         <Route path="/national-team" element={<NationalTeamRoute />} />
         <Route path="/other-matches" element={<OtherMatchesRoute />} />
         <Route path="/history" element={<HistoryRoute />} />

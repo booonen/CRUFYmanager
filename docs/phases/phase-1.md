@@ -216,18 +216,43 @@ Flagged inline above; consolidated:
 
 ---
 
-## 10. Open questions for the user (the question round)
+## 10. Resolved decisions (question round outcome)
 
-The four below get put through `AskUserQuestion`. Smaller items above default to my proposal unless you push back in the question's "Other" field.
+- **Q1 — game stats: 9 outfield + 3 GK-only.** Outfield (every player): `pace, finishing, passing, dribbling, defending, heading, vision, physicality, technique`. GK-only (every player stores them, but only meaningful for GKs): `handling, reflexes, kicking`. **12 game stats per player** in a single uniform stat block. Forms hide the 3 GK stats when the selected position isn't GK; OVR weights them at 0 for outfield positions.
+- **Q2 — personality tags: 12.** `Professional, Mercurial, Loyal, Ambitious, Hothead, Leader, Quiet, Showboat, Selfish, Dedicated, Casual, Influential`.
+- **Q3 — positions: 12.** `GK · DEF-CB · DEF-LB · DEF-RB · MID-CDM · MID-CM · MID-CAM · MID-LM · MID-RM · FWD-LW · FWD-RW · FWD-ST`. Single primary position per player in Phase 1. **Alt-position preference matrix deferred to Phase 4** (per user note: useful for lineup selection, position drift across a career, manager redeployment).
+- **Q4 — OVR formula: per-position weight matrix.** Recomputed for the 12-position × 12-stat schema (table below). Each row sums to 1.0; OVR = round(Σ stat_i × weight_i).
+- **Q5 — club deletion: Free Agents.** A reserved synthetic club (id `__free_agents__`, name "Free Agents", `kind: 'free-agents'`) hidden from competition participant pickers and undeletable. Its purpose is broader than the question implied: it is the **default `clubId` for any unassigned domestic player**, not just an aftermath of club deletion. Newly created players default there until you assign them to a real club.
 
-**Q1. Game stats list (the 10).** Accept the plan's list verbatim, or prefer one of the alternatives below?
+### 10.1 OVR weight matrix (12 positions × 12 game stats)
 
-**Q2. Personality tags.** Accept the plan's 8 verbatim, or expand for more flavour?
+Outfield positions zero out `handling`, `reflexes`, `kicking`. The GK row is the inverse: heavy on the GK trio, light on outfield stats.
 
-**Q3. Position taxonomy.** Accept the plan's 8, or split DEF-FB into LB/RB and FWD-W into LW/RW (16 total) for tactical asymmetry?
+| pos      | pace | fin  | pass | drib | def  | head | vis  | phys | tech | hand | refl | kick |
+|----------|------|------|------|------|------|------|------|------|------|------|------|------|
+| GK       | 0    | 0    | 0.10 | 0    | 0    | 0.05 | 0.05 | 0.10 | 0.05 | 0.30 | 0.25 | 0.10 |
+| DEF-CB   | 0.08 | 0.03 | 0.10 | 0.04 | 0.25 | 0.20 | 0.07 | 0.15 | 0.08 | 0    | 0    | 0    |
+| DEF-LB   | 0.20 | 0.05 | 0.15 | 0.10 | 0.20 | 0.05 | 0.05 | 0.10 | 0.10 | 0    | 0    | 0    |
+| DEF-RB   | 0.20 | 0.05 | 0.15 | 0.10 | 0.20 | 0.05 | 0.05 | 0.10 | 0.10 | 0    | 0    | 0    |
+| MID-CDM  | 0.05 | 0.05 | 0.20 | 0.08 | 0.20 | 0.07 | 0.15 | 0.12 | 0.08 | 0    | 0    | 0    |
+| MID-CM   | 0.05 | 0.10 | 0.25 | 0.10 | 0.10 | 0.05 | 0.20 | 0.05 | 0.10 | 0    | 0    | 0    |
+| MID-CAM  | 0.10 | 0.15 | 0.20 | 0.15 | 0.03 | 0.02 | 0.20 | 0.05 | 0.10 | 0    | 0    | 0    |
+| MID-LM   | 0.20 | 0.08 | 0.15 | 0.15 | 0.10 | 0.05 | 0.10 | 0.07 | 0.10 | 0    | 0    | 0    |
+| MID-RM   | 0.20 | 0.08 | 0.15 | 0.15 | 0.10 | 0.05 | 0.10 | 0.07 | 0.10 | 0    | 0    | 0    |
+| FWD-LW   | 0.25 | 0.15 | 0.10 | 0.20 | 0.02 | 0.03 | 0.10 | 0.05 | 0.10 | 0    | 0    | 0    |
+| FWD-RW   | 0.25 | 0.15 | 0.10 | 0.20 | 0.02 | 0.03 | 0.10 | 0.05 | 0.10 | 0    | 0    | 0    |
+| FWD-ST   | 0.18 | 0.30 | 0.05 | 0.15 | 0.02 | 0.10 | 0.05 | 0.08 | 0.07 | 0    | 0    | 0    |
 
-**Q4. OVR formula.** Accept the proposed weight matrix in §3.6 (tunable later), or take a different approach?
+Tunable later. Lives in `src/utils/ovr.ts` as a frozen const so the values are diff-able when we revisit.
 
-**Q5. Club deletion behaviour.** Demote players to a synthetic Free Agents club (lazy-god friendly), or forbid deletion when squad is non-empty (strict)?
+### 10.2 Smaller defaults that stand
 
-Smaller defaults I'm taking unless you say otherwise: 14–50 age range, 11/30 squad soft-warn, finances read-only in Phase 1, foreign world = leagues+clubs only (foreign players deferred to Phase 6), URL-driven filter state, no virtualisation yet.
+Age 14–50, squad soft-warn at < 11 / > 30, finances read-only, foreign world = leagues + clubs only, URL-driven filter state, no virtualisation, modal dialogs only.
+
+### 10.3 Implementation begins
+
+Per this proposal. Phase 1 ships on `claude/phase-1`; PR opens once the first scaffolding compiles.
+
+---
+
+## ~~10. Open questions for the user (the question round)~~ — answered above
