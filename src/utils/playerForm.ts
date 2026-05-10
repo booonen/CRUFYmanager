@@ -20,7 +20,7 @@ export interface PlayerFormInput {
   contractUntilSeason: number;
   squadNumber: number | null;
   stats: GameStatBlock;
-  personality: PersonalityTag;
+  personalities: PersonalityTag[];
   consistency: number;
   workRate: number;
   injuryProneness: number;
@@ -30,10 +30,18 @@ export interface PlayerFormInput {
   currentFitness: number;
 }
 
-export function newPlayerFormInput(calendar: Calendar, clubId: string): PlayerFormInput {
+export interface NewPlayerDefaults {
+  nationality?: string;
+}
+
+export function newPlayerFormInput(
+  calendar: Calendar,
+  clubId: string,
+  defaults: NewPlayerDefaults = {},
+): PlayerFormInput {
   return {
     name: '',
-    nationality: '',
+    nationality: defaults.nationality ?? '',
     position: 'MID-CM',
     preferredFoot: 'R',
     age: 22,
@@ -41,7 +49,7 @@ export function newPlayerFormInput(calendar: Calendar, clubId: string): PlayerFo
     contractUntilSeason: calendar.currentSeason + 3,
     squadNumber: null,
     stats: defaultStatBlock(),
-    personality: 'Professional',
+    personalities: ['Professional'],
     consistency: 60,
     workRate: 60,
     injuryProneness: 30,
@@ -65,7 +73,7 @@ export function playerFormToDomain(input: PlayerFormInput, calendar: Calendar): 
       ...input.stats,
       injuryProneness: input.injuryProneness,
       potential: input.potential,
-      personality: input.personality,
+      personalities: [...input.personalities],
       consistency: input.consistency,
       workRate: input.workRate,
       ovr: computeOvr(input.position, input.stats),
@@ -112,7 +120,7 @@ export function domesticPlayerToFormInput(
     contractUntilSeason: player.contractUntilSeason,
     squadNumber: player.squadNumber,
     stats: game,
-    personality: stats.personality,
+    personalities: [...stats.personalities],
     consistency: stats.consistency,
     workRate: stats.workRate,
     injuryProneness: stats.injuryProneness,

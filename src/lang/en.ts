@@ -117,6 +117,15 @@ export const en = {
       gkStats: 'Goalkeeping (GK only)',
       hidden: 'Character & potential',
       contract: 'Contract & condition',
+      career: 'Career history',
+      careerEmpty: 'No career history yet. Appearances accumulate as the sim plays matches.',
+    },
+    profile: {
+      back: 'Back to players',
+      notFound: 'Player not found',
+      notFoundBody: 'They may have been deleted. Head back to the player list.',
+      gkOnlyHidden: '(hidden for non-GKs)',
+      condition: 'Condition',
     },
     fields: {
       name: 'Full name',

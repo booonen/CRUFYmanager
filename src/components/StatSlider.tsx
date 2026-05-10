@@ -1,4 +1,5 @@
 import { clampStat } from '../utils/ovr';
+import { NumberInput } from './NumberInput';
 
 interface StatSliderProps {
   label: string;
@@ -26,14 +27,13 @@ export function StatSlider({ label, value, onChange, disabled, hint }: StatSlide
           onChange={(e) => onChange(clampStat(Number(e.target.value)))}
           className="stat-slider__range"
         />
-        <input
-          type="number"
+        <NumberInput
           min={0}
           max={100}
           step={1}
           value={value}
           disabled={disabled}
-          onChange={(e) => onChange(clampStat(Number(e.target.value)))}
+          onCommit={onChange}
           className="input mono stat-slider__num"
         />
       </div>

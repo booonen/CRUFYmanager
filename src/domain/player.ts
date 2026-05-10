@@ -68,12 +68,15 @@ export type GameStatBlock = Record<GameStat, number>;
 export interface FullPlayerStats extends GameStatBlock {
   injuryProneness: number;
   potential: number;
-  personality: PersonalityTag;
+  personalities: PersonalityTag[];
   consistency: number;
   workRate: number;
 
   ovr: number;
 }
+
+export const MIN_PERSONALITIES = 1;
+export const MAX_PERSONALITIES = 3;
 
 export interface Injury {
   description: string;

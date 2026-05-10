@@ -2,6 +2,7 @@ import type { Savefile } from '../domain/savefile';
 import { SCHEMA_VERSION } from '../domain/savefile';
 import { ensureFreeAgentsClub } from '../utils/freeAgents';
 import type { Club } from '../domain/club';
+import type { Player } from '../domain/player';
 
 export type Migration = (savefile: Savefile) => Savefile;
 
@@ -17,6 +18,27 @@ const migrations: Record<number, Migration> = {
       meta: { ...sf.meta, schemaVersion: 2 },
     };
     return ensureFreeAgentsClub(next);
+  },
+  2: (sf) => {
+    const players: Player[] = sf.players.map((p) => {
+      if (p.tier === 'foreign-nt-stub') return p;
+      const stats = p.stats as typeof p.stats & { personality?: string };
+      const existing = (stats as { personalities?: string[] }).personalities;
+      const seed: string[] = Array.isArray(existing) && existing.length > 0
+        ? existing
+        : stats.personality
+        ? [stats.personality]
+        : ['Professional'];
+      const cleaned = { ...stats } as unknown as Record<string, unknown>;
+      delete cleaned.personality;
+      cleaned.personalities = seed;
+      return { ...p, stats: cleaned as unknown as typeof p.stats };
+    });
+    return {
+      ...sf,
+      players,
+      meta: { ...sf.meta, schemaVersion: 3 },
+    };
   },
 };
 

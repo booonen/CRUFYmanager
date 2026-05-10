@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from './Button';
 import { Modal } from './Modal';
+import { NumberInput } from './NumberInput';
 import { t } from '../lang';
 import type { ForeignClub, ForeignLeague } from '../domain/foreignWorld';
 import type { ForeignClubInput } from '../stores/foreignWorld';
@@ -123,15 +124,12 @@ export function ForeignClubFormModal({
         </div>
         <div className="field">
           <label className="field__label">{t('world.fields.ovr')}</label>
-          <input
-            type="number"
+          <NumberInput
             min={0}
             max={100}
             className="input mono"
             value={form.ovr}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, ovr: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }))
-            }
+            onCommit={(v) => setForm((f) => ({ ...f, ovr: v }))}
           />
           <div className="field__hint">{t('world.fields.ovrHint')}</div>
         </div>

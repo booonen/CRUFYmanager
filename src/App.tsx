@@ -9,6 +9,7 @@ import { HistoryRoute } from './routes/History';
 import { ManagersRoute } from './routes/Managers';
 import { NationalTeamRoute } from './routes/NationalTeam';
 import { OtherMatchesRoute } from './routes/OtherMatches';
+import { PlayerDetailRoute } from './routes/PlayerDetail';
 import { PlayersRoute } from './routes/Players';
 import { SavesRoute } from './routes/Saves';
 import { WorldRoute } from './routes/World';
@@ -33,6 +34,7 @@ export function App() {
         <Route path="/competitions" element={<CompetitionsRoute />} />
         <Route path="/clubs" element={<ClubsRoute />} />
         <Route path="/players" element={<PlayersRoute />} />
+        <Route path="/players/:id" element={<PlayerDetailRoute />} />
         <Route path="/managers" element={<ManagersRoute />} />
         <Route path="/national-team" element={<NationalTeamRoute />} />
         <Route path="/other-matches" element={<OtherMatchesRoute />} />

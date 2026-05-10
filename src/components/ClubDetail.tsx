@@ -14,7 +14,7 @@ import { useSavefileStore } from '../stores/savefile';
 import { unassignManager } from '../stores/clubs';
 import { addDomesticPlayer } from '../stores/players';
 import { useManager } from '../stores/managers';
-import { newPlayerFormInput, type PlayerFormInput } from '../utils/playerForm';
+import { newPlayerFormInput } from '../utils/playerForm';
 
 interface ClubDetailProps {
   club: Club;
@@ -25,6 +25,7 @@ interface ClubDetailProps {
 
 export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
   const calendar = useSavefileStore((s) => s.savefile?.calendar ?? null);
+  const countryName = useSavefileStore((s) => s.savefile?.meta.countryName ?? '');
   const manager = useManager(club.managerId);
   const isFreeAgents = isFreeAgentsClub(club);
   const [assigningManager, setAssigningManager] = useState(false);
@@ -71,7 +72,6 @@ export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
           <Stat label={t('clubs.detail.squad')} value={squad.length} />
           <Stat label={t('clubs.detail.capacity')} value={club.stadium.capacity.toLocaleString()} />
           <Stat label={t('clubs.detail.founded')} value={club.founded} />
-          <Stat label={t('clubs.detail.balance')} value={`§${club.finances.balance.toLocaleString()}`} />
         </div>
       ) : null}
 
@@ -205,7 +205,11 @@ export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
       <PlayerFormModal
         open={addingPlayer}
         initial={null}
-        defaults={defaultPlayerForClub(club.id, calendar.currentSeason)}
+        defaults={
+          isFreeAgents
+            ? undefined
+            : newPlayerFormInput(calendar, club.id, { nationality: countryName })
+        }
         onCancel={() => setAddingPlayer(false)}
         onSubmit={async (input) => {
           addDomesticPlayer(input);
@@ -223,12 +227,4 @@ function Stat({ label, value }: { label: string; value: string | number }) {
       <div className="stat-card__label">{label}</div>
     </div>
   );
-}
-
-function defaultPlayerForClub(clubId: string, season: number): PlayerFormInput {
-  const fallback = newPlayerFormInput(
-    { currentSeason: season, currentMatchday: 1, matchdaysPerSeason: 52, schedule: [] },
-    clubId,
-  );
-  return fallback;
 }

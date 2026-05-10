@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from './Button';
 import { Modal } from './Modal';
+import { NumberInput } from './NumberInput';
 import { t } from '../lang';
 import type { ForeignLeague } from '../domain/foreignWorld';
 import type { ForeignLeagueInput } from '../stores/foreignWorld';
@@ -78,14 +79,11 @@ export function ForeignLeagueFormModal({
         </div>
         <div className="field">
           <label className="field__label">{t('world.fields.tier')}</label>
-          <input
-            type="number"
+          <NumberInput
             className="input mono"
             min={1}
             value={form.tier}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, tier: Math.max(1, Number(e.target.value) || 1) }))
-            }
+            onCommit={(v) => setForm((f) => ({ ...f, tier: v }))}
           />
           <div className="field__hint">{t('world.fields.tierHint')}</div>
         </div>

@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { Button } from './Button';
 import { FormationPicker } from './FormationPicker';
 import { Modal } from './Modal';
+import { NumberInput } from './NumberInput';
 import { StatSlider } from './StatSlider';
 import { TacticalProfilePicker } from './TacticalProfilePicker';
 import { t } from '../lang';
 import type { Manager, ManagerStats } from '../domain/manager';
 import type { ManagerInput } from '../stores/managers';
 import { defaultManagerStats } from '../stores/managers';
+import { useSavefileStore } from '../stores/savefile';
 
 interface ManagerFormModalProps {
   open: boolean;
@@ -16,9 +18,9 @@ interface ManagerFormModalProps {
   onSubmit: (input: ManagerInput) => void | Promise<void>;
 }
 
-const blankInput = (): ManagerInput => ({
+const blankInput = (nationality: string): ManagerInput => ({
   name: '',
-  nationality: '',
+  nationality,
   age: 45,
   stats: defaultManagerStats(),
   preferredFormation: '4-3-3',
@@ -35,15 +37,16 @@ const fromManager = (m: Manager): ManagerInput => ({
 });
 
 export function ManagerFormModal({ open, initial, onCancel, onSubmit }: ManagerFormModalProps) {
-  const [form, setForm] = useState<ManagerInput>(blankInput);
+  const countryName = useSavefileStore((s) => s.savefile?.meta.countryName ?? '');
+  const [form, setForm] = useState<ManagerInput>(() => blankInput(countryName));
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setForm(initial ? fromManager(initial) : blankInput());
+      setForm(initial ? fromManager(initial) : blankInput(countryName));
       setSubmitting(false);
     }
-  }, [open, initial]);
+  }, [open, initial, countryName]);
 
   const canSubmit = form.name.trim().length > 0 && form.age >= 18 && form.age <= 90 && !submitting;
 
@@ -96,18 +99,12 @@ export function ManagerFormModal({ open, initial, onCancel, onSubmit }: ManagerF
           </div>
           <div className="field">
             <label className="field__label">{t('managers.fields.age')}</label>
-            <input
-              type="number"
+            <NumberInput
               className="input mono"
               min={18}
               max={90}
               value={form.age}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  age: Math.max(18, Math.min(90, Number(e.target.value) || 18)),
-                }))
-              }
+              onCommit={(v) => setForm((f) => ({ ...f, age: v }))}
             />
           </div>
         </div>

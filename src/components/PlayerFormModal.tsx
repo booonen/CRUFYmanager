@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from './Button';
 import { Modal } from './Modal';
+import { NumberInput } from './NumberInput';
 import { OvrBadge } from './OvrBadge';
 import { PersonalityPicker } from './PersonalityPicker';
 import { PositionPicker } from './PositionPicker';
@@ -52,18 +53,21 @@ export function PlayerFormModal({
   onSubmit,
 }: PlayerFormModalProps) {
   const calendar = useSavefileStore((s) => s.savefile?.calendar ?? null);
+  const countryName = useSavefileStore((s) => s.savefile?.meta.countryName ?? '');
   const allClubs = useSavefileStore((s) => s.savefile?.clubs ?? []);
   const allPlayers = useSavefileStore((s) => s.savefile?.players ?? []);
 
-  const [form, setForm] = useState<PlayerFormInput>(() => makeInitial(initial, defaults, calendar));
+  const [form, setForm] = useState<PlayerFormInput>(() =>
+    makeInitial(initial, defaults, calendar, countryName),
+  );
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setForm(makeInitial(initial, defaults, calendar));
+      setForm(makeInitial(initial, defaults, calendar, countryName));
       setSubmitting(false);
     }
-  }, [open, initial, defaults, calendar]);
+  }, [open, initial, defaults, calendar, countryName]);
 
   useEffect(() => {
     if (!open || !initial) return;
@@ -126,15 +130,12 @@ export function PlayerFormModal({
           </div>
           <div className="field">
             <label className="field__label">{t('players.fields.age')}</label>
-            <input
-              type="number"
+            <NumberInput
               className="input mono"
               value={form.age}
               min={14}
               max={50}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, age: Math.max(14, Math.min(50, Number(e.target.value) || 14)) }))
-              }
+              onCommit={(v) => setForm((f) => ({ ...f, age: v }))}
             />
             <div className="field__hint">{t('players.fields.ageHint')}</div>
           </div>
@@ -227,8 +228,10 @@ export function PlayerFormModal({
         <div className="field">
           <label className="field__label">{t('players.fields.personality')}</label>
           <PersonalityPicker
-            value={form.personality}
-            onChange={(p) => setForm((f) => ({ ...f, personality: p }))}
+            values={form.personalities}
+            min={1}
+            max={3}
+            onChange={(p) => setForm((f) => ({ ...f, personalities: p }))}
           />
         </div>
         <div className="form-grid">
@@ -260,36 +263,22 @@ export function PlayerFormModal({
         <div className="form-grid">
           <div className="field">
             <label className="field__label">{t('players.fields.contractUntil')}</label>
-            <input
-              type="number"
+            <NumberInput
               className="input mono"
               value={form.contractUntilSeason}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  contractUntilSeason: Number(e.target.value) || f.contractUntilSeason,
-                }))
-              }
+              onCommit={(v) => setForm((f) => ({ ...f, contractUntilSeason: v }))}
             />
           </div>
           <div className="field">
             <label className="field__label">{t('players.fields.squadNumber')}</label>
-            <input
-              type="number"
+            <NumberInput
               className="input mono"
               min={1}
               max={99}
-              value={form.squadNumber ?? ''}
-              placeholder="—"
-              onChange={(e) => {
-                const raw = e.target.value;
-                if (raw === '') {
-                  setForm((f) => ({ ...f, squadNumber: null }));
-                  return;
-                }
-                const n = Math.max(1, Math.min(99, Number(raw) || 1));
-                setForm((f) => ({ ...f, squadNumber: n }));
-              }}
+              value={form.squadNumber ?? 0}
+              onCommit={(v) =>
+                setForm((f) => ({ ...f, squadNumber: v === 0 ? null : v }))
+              }
             />
             <div className="field__hint">{t('players.fields.squadNumberHint')}</div>
           </div>
@@ -318,14 +307,16 @@ function makeInitial(
   player: DomesticPlayer | null,
   defaults: PlayerFormInput | undefined,
   calendar: import('../domain/calendar').Calendar | null,
+  countryName: string,
 ): PlayerFormInput {
   if (player && calendar) return domesticPlayerToFormInput(player, calendar);
   if (defaults) return defaults;
-  if (calendar) return newPlayerFormInput(calendar, FREE_AGENTS_CLUB_ID);
-  // Fallback for the brief moment before hydration completes.
+  if (calendar) {
+    return newPlayerFormInput(calendar, FREE_AGENTS_CLUB_ID, { nationality: countryName });
+  }
   return {
     name: '',
-    nationality: '',
+    nationality: countryName,
     position: 'MID-CM',
     preferredFoot: 'R',
     age: 22,
@@ -333,7 +324,7 @@ function makeInitial(
     contractUntilSeason: 4,
     squadNumber: null,
     stats: defaultStatBlock(),
-    personality: 'Professional',
+    personalities: ['Professional'],
     consistency: 60,
     workRate: 60,
     injuryProneness: 30,

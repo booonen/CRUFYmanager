@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
-import { ConfirmModal } from '../components/ConfirmModal';
 import { EmptyState } from '../components/EmptyState';
 import { OvrBadge } from '../components/OvrBadge';
 import { PageHeading } from '../components/PageHeading';
@@ -11,11 +10,10 @@ import { t } from '../lang';
 import {
   PERSONALITY_TAGS,
   POSITIONS,
-  type DomesticPlayer,
   type PersonalityTag,
   type Position,
 } from '../domain/player';
-import { addDomesticPlayer, deletePlayer, updateDomesticPlayer, useDomesticPlayers } from '../stores/players';
+import { addDomesticPlayer, useDomesticPlayers } from '../stores/players';
 import { useClubs } from '../stores/clubs';
 import { useSavefileStore } from '../stores/savefile';
 import { computeAge } from '../utils/age';
@@ -29,6 +27,7 @@ export function PlayersRoute() {
   const calendar = useSavefileStore((s) => s.savefile?.calendar ?? null);
   const players = useDomesticPlayers();
   const clubs = useClubs();
+  const navigate = useNavigate();
 
   const [search, setSearch] = useState('');
   const [clubFilter, setClubFilter] = useState<string>('');
@@ -37,8 +36,6 @@ export function PlayersRoute() {
   const [sortKey, setSortKey] = useState<SortKey>('ovrDesc');
 
   const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<DomesticPlayer | null>(null);
-  const [deleting, setDeleting] = useState<DomesticPlayer | null>(null);
 
   const filtered = useMemo(() => {
     if (!calendar) return [];
@@ -47,7 +44,7 @@ export function PlayersRoute() {
       if (q && !p.name.toLowerCase().includes(q)) return false;
       if (clubFilter && p.clubId !== clubFilter) return false;
       if (posFilter && p.position !== posFilter) return false;
-      if (personalityFilter && p.stats.personality !== personalityFilter) return false;
+      if (personalityFilter && !p.stats.personalities.includes(personalityFilter)) return false;
       return true;
     });
     result = [...result].sort((a, b) => {
@@ -68,9 +65,8 @@ export function PlayersRoute() {
   }, [players, search, clubFilter, posFilter, personalityFilter, sortKey, calendar]);
 
   useEffect(() => {
-    if (editing && !players.some((p) => p.id === editing.id)) setEditing(null);
-    if (deleting && !players.some((p) => p.id === deleting.id)) setDeleting(null);
-  }, [players, editing, deleting]);
+    // no-op: list-level edit/delete state moved to PlayerDetail
+  }, [players]);
 
   if (status !== 'ready' || !calendar) {
     return (
@@ -183,14 +179,13 @@ export function PlayersRoute() {
                 <th>OVR</th>
                 <th>Club</th>
                 <th>Personality</th>
-                <th style={{ width: 1 }}></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((p) => {
                 const club = clubs.find((c) => c.id === p.clubId);
                 return (
-                  <tr key={p.id} onClick={() => setEditing(p)}>
+                  <tr key={p.id} onClick={() => navigate(`/players/${p.id}`)}>
                     <td style={{ fontWeight: 500 }}>{p.name}</td>
                     <td>
                       <PositionPill position={p.position} />
@@ -201,16 +196,7 @@ export function PlayersRoute() {
                     </td>
                     <td className="text-dim">{club?.name ?? '—'}</td>
                     <td className="text-dim" style={{ fontSize: 12 }}>
-                      {p.stats.personality}
-                    </td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => setDeleting(p)}
-                      >
-                        {t('common.delete')}
-                      </Button>
+                      {p.stats.personalities.join(', ')}
                     </td>
                   </tr>
                 );
@@ -221,37 +207,15 @@ export function PlayersRoute() {
       )}
 
       <PlayerFormModal
-        open={creating || editing !== null}
-        initial={editing}
-        onCancel={() => {
-          setCreating(false);
-          setEditing(null);
-        }}
+        open={creating}
+        initial={null}
+        onCancel={() => setCreating(false)}
         onSubmit={async (input) => {
-          if (editing) {
-            updateDomesticPlayer(editing.id, input);
-          } else {
-            addDomesticPlayer(input);
-          }
+          const id = addDomesticPlayer(input);
           setCreating(false);
-          setEditing(null);
+          navigate(`/players/${id}`);
         }}
       />
-
-      {deleting ? (
-        <ConfirmModal
-          open={true}
-          title={t('players.deleteTitle')}
-          confirmLabel={t('players.delete')}
-          variant="danger"
-          body={t('players.deleteWarning', { name: deleting.name })}
-          onCancel={() => setDeleting(null)}
-          onConfirm={() => {
-            deletePlayer(deleting.id);
-            setDeleting(null);
-          }}
-        />
-      ) : null}
     </>
   );
 }

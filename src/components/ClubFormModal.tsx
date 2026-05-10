@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { Button } from './Button';
 import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { Modal } from './Modal';
+import { NumberInput } from './NumberInput';
 import { t } from '../lang';
 import type { Club } from '../domain/club';
 import type { ClubInput } from '../stores/clubs';
+import { useSavefileStore } from '../stores/savefile';
 
 interface ClubFormModalProps {
   open: boolean;
@@ -22,20 +24,20 @@ interface FormState {
   secondary: string;
   stadiumName: string;
   stadiumCapacity: number;
-  balance: number;
 }
 
-const blank: FormState = {
-  name: '',
-  shortName: '',
-  city: '',
-  founded: 1900,
-  primary: '#d4a73c',
-  secondary: '#1a1206',
-  stadiumName: '',
-  stadiumCapacity: 20000,
-  balance: 0,
-};
+function blankFor(currentSeason: number): FormState {
+  return {
+    name: '',
+    shortName: '',
+    city: '',
+    founded: currentSeason,
+    primary: '#d4a73c',
+    secondary: '#1a1206',
+    stadiumName: '',
+    stadiumCapacity: 20000,
+  };
+}
 
 function fromClub(c: Club): FormState {
   return {
@@ -47,20 +49,20 @@ function fromClub(c: Club): FormState {
     secondary: c.colors.secondary,
     stadiumName: c.stadium.name,
     stadiumCapacity: c.stadium.capacity,
-    balance: c.finances.balance,
   };
 }
 
 export function ClubFormModal({ open, initial, onCancel, onSubmit }: ClubFormModalProps) {
-  const [form, setForm] = useState<FormState>(blank);
+  const currentSeason = useSavefileStore((s) => s.savefile?.calendar.currentSeason ?? 1);
+  const [form, setForm] = useState<FormState>(() => blankFor(currentSeason));
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setForm(initial ? fromClub(initial) : blank);
+      setForm(initial ? fromClub(initial) : blankFor(currentSeason));
       setSubmitting(false);
     }
-  }, [open, initial]);
+  }, [open, initial, currentSeason]);
 
   const canSubmit =
     form.name.trim().length > 0 &&
@@ -80,7 +82,7 @@ export function ClubFormModal({ open, initial, onCancel, onSubmit }: ClubFormMod
         founded: form.founded,
         colors: { primary: form.primary, secondary: form.secondary },
         stadium: { name: form.stadiumName.trim(), capacity: form.stadiumCapacity },
-        finances: { balance: form.balance },
+        finances: { balance: initial?.finances.balance ?? 0 },
         managerId: initial?.managerId ?? null,
       });
     } finally {
@@ -133,13 +135,10 @@ export function ClubFormModal({ open, initial, onCancel, onSubmit }: ClubFormMod
           </div>
           <div className="field">
             <label className="field__label">{t('clubs.fields.founded')}</label>
-            <input
-              type="number"
+            <NumberInput
               className="input mono"
               value={form.founded}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, founded: Number(e.target.value) || 0 }))
-              }
+              onCommit={(v) => setForm((f) => ({ ...f, founded: v }))}
             />
             <div className="field__hint">{t('clubs.fields.foundedHint')}</div>
           </div>
@@ -170,25 +169,11 @@ export function ClubFormModal({ open, initial, onCancel, onSubmit }: ClubFormMod
           </div>
           <div className="field">
             <label className="field__label">{t('clubs.fields.stadiumCapacity')}</label>
-            <input
-              type="number"
+            <NumberInput
               className="input mono"
               value={form.stadiumCapacity}
               min={0}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, stadiumCapacity: Math.max(0, Number(e.target.value) || 0) }))
-              }
-            />
-          </div>
-          <div className="field">
-            <label className="field__label">{t('clubs.fields.balance')}</label>
-            <input
-              type="number"
-              className="input mono"
-              value={form.balance}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, balance: Number(e.target.value) || 0 }))
-              }
+              onCommit={(v) => setForm((f) => ({ ...f, stadiumCapacity: v }))}
             />
           </div>
         </div>

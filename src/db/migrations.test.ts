@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { migrate } from './migrations';
 import type { Savefile } from '../domain/savefile';
+import { SCHEMA_VERSION } from '../domain/savefile';
 import { FREE_AGENTS_CLUB_ID } from '../domain/club';
 
 function v1Savefile(): Savefile {
@@ -52,6 +53,58 @@ function v1Savefile(): Savefile {
   };
 }
 
+function v2SavefileWithLegacyPlayer(): Savefile {
+  const sf = migrate(v1Savefile());
+  return {
+    ...sf,
+    meta: { ...sf.meta, schemaVersion: 2 },
+    players: [
+      {
+        id: 'legacy',
+        tier: 'domestic',
+        name: 'Legacy P',
+        nationality: 'X',
+        position: 'MID-CM',
+        preferredFoot: 'R',
+        dateOfBirth: { season: -23, matchday: 1 },
+        clubId: FREE_AGENTS_CLUB_ID,
+        contractUntilSeason: 5,
+        squadNumber: null,
+        currentForm: 60,
+        currentMorale: 75,
+        currentFitness: 100,
+        injury: null,
+        careerHistory: [],
+        stats: {
+          pace: 50,
+          finishing: 50,
+          passing: 50,
+          dribbling: 50,
+          defending: 50,
+          heading: 50,
+          vision: 50,
+          physicality: 50,
+          technique: 50,
+          handling: 50,
+          reflexes: 50,
+          kicking: 50,
+          injuryProneness: 30,
+          potential: 70,
+          consistency: 60,
+          workRate: 60,
+          ovr: 50,
+          // legacy single personality field
+          personality: 'Hothead',
+        } as unknown as Savefile['players'][number] extends infer P
+          ? P extends { stats: infer S }
+            ? S
+            : never
+          : never,
+      },
+    ] as unknown as Savefile['players'],
+  };
+}
+
 describe('migrate v1 -> v2', () => {
   it('adds Club.kind = "club" to existing clubs', () => {
     const result = migrate(v1Savefile());
@@ -66,16 +119,47 @@ describe('migrate v1 -> v2', () => {
     expect(fa?.kind).toBe('free-agents');
   });
 
-  it('bumps the schemaVersion to 2', () => {
+  it('bumps the schemaVersion to current', () => {
     const result = migrate(v1Savefile());
-    expect(result.meta.schemaVersion).toBe(2);
+    expect(result.meta.schemaVersion).toBe(SCHEMA_VERSION);
   });
 
   it('is a no-op on an already-current savefile', () => {
     const v1 = v1Savefile();
-    const v2 = migrate(v1);
-    const v2Again = migrate(v2);
-    expect(v2Again.clubs.length).toBe(v2.clubs.length);
-    expect(v2Again.meta.schemaVersion).toBe(2);
+    const current = migrate(v1);
+    const again = migrate(current);
+    expect(again.clubs.length).toBe(current.clubs.length);
+    expect(again.meta.schemaVersion).toBe(SCHEMA_VERSION);
+  });
+});
+
+describe('migrate v2 -> v3', () => {
+  it('wraps a single legacy personality field into the personalities array', () => {
+    const v2 = v2SavefileWithLegacyPlayer();
+    const v3 = migrate(v2);
+    const p = v3.players.find((pp) => pp.id === 'legacy');
+    expect(p).toBeDefined();
+    if (!p || p.tier !== 'domestic') throw new Error('expected domestic player');
+    expect(Array.isArray(p.stats.personalities)).toBe(true);
+    expect(p.stats.personalities).toEqual(['Hothead']);
+    expect((p.stats as unknown as Record<string, unknown>).personality).toBeUndefined();
+  });
+
+  it('falls back to ["Professional"] when neither personality nor personalities exists', () => {
+    const v2 = v2SavefileWithLegacyPlayer();
+    const broken: Savefile = {
+      ...v2,
+      players: v2.players.map((p) => {
+        if (p.tier !== 'domestic') return p;
+        const cleaned = { ...p.stats } as unknown as Record<string, unknown>;
+        delete cleaned.personality;
+        delete cleaned.personalities;
+        return { ...p, stats: cleaned as unknown as typeof p.stats };
+      }),
+    };
+    const v3 = migrate(broken);
+    const p = v3.players.find((pp) => pp.id === 'legacy');
+    if (!p || p.tier !== 'domestic') throw new Error('expected domestic player');
+    expect(p.stats.personalities).toEqual(['Professional']);
   });
 });
