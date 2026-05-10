@@ -1,0 +1,42 @@
+{
+  "code": "chinese",
+  "displayName": "Chinese",
+  "notes": "Common Mandarin Pinyin names. firstNames includes both single- and double-character given names.",
+  "firstNames": [
+    "Wei", "Lei", "Jun", "Yang", "Tao", "Bo", "Ming", "Hao", "Jie", "Gang",
+    "Bin", "Peng", "Hui", "Feng", "Ping", "Yong", "Liang", "Bing", "Lin", "Long",
+    "Jian", "Hong", "Cheng", "Kai", "Xin", "Xun", "Zhi", "Yi", "Yu", "Han",
+    "Jianhua", "Jianjun", "Jianguo", "Yongqiang", "Hongwei", "Wenbo", "Junjie", "Yifei", "Zhengyu", "Boxuan",
+    "Haoran", "Junkai", "Mingyu", "Tianyi", "Chenxi", "Hanyu", "Yichen", "Zihao", "Junhao", "Mingwei",
+    "Bowen", "Jiaxin", "Jiarui", "Lianjie", "Mingxuan", "Ruixin", "Tianhao", "Weixin", "Xinyue", "Yuhao",
+    "Zhihao", "Shuhao", "Boyang", "Chenyu", "Dongyu", "Fanglin", "Guanyu", "Hancheng", "Haoyang", "Jiawei",
+    "Kaiwen", "Liwei", "Mingze", "Naixin", "Pengyu", "Qihang", "Ruoxi", "Shitao", "Tianyu", "Wenkai",
+    "Xinyi", "Yifeng", "Zhenghua", "Zihan", "Mingjun", "Xueqian", "Yongheng", "Zhuoran", "Yangcheng", "Bochen"
+  ],
+  "lastNames": [
+    "Wang", "Li", "Zhang", "Liu", "Chen", "Yang", "Huang", "Zhao", "Wu", "Zhou",
+    "Xu", "Sun", "Ma", "Zhu", "Hu", "Guo", "He", "Gao", "Lin", "Luo",
+    "Zheng", "Liang", "Xie", "Song", "Tang", "Han", "Feng", "Deng", "Cao", "Peng",
+    "Zeng", "Xiao", "Tian", "Dong", "Pan", "Yuan", "Yu", "Du", "Su", "Ye",
+    "Lu", "Cui", "Cheng", "Xue", "Lei", "Bai", "Long", "Yan", "Hou", "Mao",
+    "Tan", "Jia", "Qian", "Wei", "Bao", "Jiang", "Niu", "Yao", "Xia", "Pang",
+    "Fan", "Qin", "Ruan", "Shi", "Yi", "Mo", "An", "Pu", "Chai", "Geng",
+    "Mei", "Mu", "Ni", "Pei", "Qi", "Qiao", "Quan", "Sha", "Tian", "Tong",
+    "Tu", "Wan", "Wei", "Xian", "Xun", "Yan", "Yu", "Zang", "Zhan", "Zhuang"
+  ],
+  "cities": [
+    "Beijing", "Shanghai", "Guangzhou", "Shenzhen", "Chengdu", "Tianjin", "Wuhan", "Xi'an", "Hangzhou", "Nanjing",
+    "Chongqing", "Suzhou", "Qingdao", "Dalian", "Shenyang", "Jinan", "Zhengzhou", "Changsha", "Harbin", "Kunming",
+    "Fuzhou", "Xiamen", "Hefei", "Nanchang", "Ningbo", "Wenzhou", "Wuxi", "Foshan", "Dongguan", "Zhongshan",
+    "Lanzhou", "Taiyuan", "Guiyang", "Nanning", "Haikou"
+  ],
+  "clubTemplates": [
+    "{city} FC",
+    "{city} United",
+    "{city} City",
+    "{city} Tigers",
+    "{city} Dragons",
+    "{city} Eastern",
+    "{city} Sports"
+  ]
+}

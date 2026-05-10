@@ -1,0 +1,43 @@
+{
+  "code": "slavic",
+  "displayName": "Slavic",
+  "notes": "Macro pool mixing Russian, Polish, Ukrainian, Czech, Serbian, Croatian, and Bulgarian common names. Plausibly-Slavic rather than ethnographically precise.",
+  "firstNames": [
+    "Alexei", "Dmitri", "Sergei", "Andrei", "Mikhail", "Nikolai", "Pavel", "Igor", "Boris", "Viktor",
+    "Yuri", "Vladimir", "Anton", "Roman", "Maxim", "Denis", "Artem", "Ivan", "Konstantin", "Aleksandr",
+    "Piotr", "Tomasz", "Jakub", "Krzysztof", "Wojciech", "Marcin", "Łukasz", "Mateusz", "Bartosz", "Robert",
+    "Jan", "Adam", "Michał", "Kamil", "Filip", "Dawid", "Szymon", "Maksymilian", "Aleksander", "Antoni",
+    "Vasyl", "Oleksandr", "Mykola", "Andriy", "Bohdan", "Taras", "Yaroslav", "Volodymyr", "Stepan", "Ostap",
+    "Petr", "Miroslav", "Tomáš", "Jiří", "Václav", "Pavel", "Karel", "Marek", "Radek", "Zdeněk",
+    "Nemanja", "Stefan", "Marko", "Nikola", "Aleksandar", "Miloš", "Dušan", "Filip", "Lazar", "Uroš",
+    "Hrvoje", "Ivica", "Luka", "Mateo", "Nikola", "Tomislav", "Petar", "Damir", "Stipe", "Zlatko",
+    "Krasimir", "Stoyan", "Stefan", "Borislav", "Ivailo", "Plamen", "Rumen", "Tihomir", "Veselin", "Zhivko"
+  ],
+  "lastNames": [
+    "Ivanov", "Smirnov", "Kuznetsov", "Popov", "Sokolov", "Lebedev", "Kozlov", "Novikov", "Morozov", "Petrov",
+    "Volkov", "Solovyov", "Vasilyev", "Zaytsev", "Pavlov", "Semenov", "Golubev", "Vinogradov", "Bogdanov", "Vorobyov",
+    "Nowak", "Kowalski", "Wiśniewski", "Wójcik", "Kowalczyk", "Kamiński", "Lewandowski", "Zieliński", "Szymański", "Woźniak",
+    "Dąbrowski", "Kozłowski", "Jankowski", "Mazur", "Kwiatkowski", "Krawczyk", "Kaczmarek", "Piotrowski", "Grabowski", "Pawlak",
+    "Shevchenko", "Boyko", "Tkachenko", "Kovalenko", "Bondarenko", "Kravchenko", "Oliynyk", "Shevchuk", "Polishchuk", "Marchenko",
+    "Novák", "Svoboda", "Novotný", "Dvořák", "Černý", "Procházka", "Kučera", "Veselý", "Horák", "Němec",
+    "Jovanović", "Petrović", "Nikolić", "Marković", "Đorđević", "Stojanović", "Pavlović", "Mitrović", "Stanković", "Ilić",
+    "Horvat", "Kovačević", "Babić", "Marić", "Jurić", "Novak", "Knežević", "Pavić", "Vuković", "Tomić",
+    "Petrov", "Dimitrov", "Georgiev", "Ivanov", "Stoyanov", "Hristov", "Nikolov", "Marinov", "Aleksandrov", "Todorov"
+  ],
+  "cities": [
+    "Moskva", "Sankt Peterburg", "Kiev", "Kharkov", "Lviv", "Odessa", "Warszawa", "Kraków", "Wrocław", "Poznań",
+    "Gdańsk", "Łódź", "Praha", "Brno", "Ostrava", "Plzeň", "Beograd", "Novi Sad", "Niš", "Zagreb",
+    "Split", "Rijeka", "Sofia", "Plovdiv", "Varna", "Minsk", "Tashkent", "Almaty", "Bratislava", "Sarajevo",
+    "Skopje", "Ljubljana", "Maribor", "Tbilisi"
+  ],
+  "clubTemplates": [
+    "FK {city}",
+    "FC {city}",
+    "Dynamo {city}",
+    "Spartak {city}",
+    "Lokomotiv {city}",
+    "Slavia {city}",
+    "Zenit {city}",
+    "Partizan {city}"
+  ]
+}

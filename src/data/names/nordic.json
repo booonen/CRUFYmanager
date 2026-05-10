@@ -1,0 +1,42 @@
+{
+  "code": "nordic",
+  "displayName": "Nordic",
+  "notes": "Macro pool: Swedish, Norwegian, Danish, Icelandic, with a sprinkle of Finnish.",
+  "firstNames": [
+    "Erik", "Lars", "Anders", "Per", "Magnus", "Johan", "Karl", "Henrik", "Olof", "Gustav",
+    "Oskar", "Niklas", "Fredrik", "Mattias", "Tobias", "Daniel", "Jonas", "Mikael", "Stefan", "Andreas",
+    "Bjørn", "Eirik", "Gunnar", "Håkon", "Knut", "Ola", "Sigurd", "Tor", "Vegard", "Kjetil",
+    "Lars-Erik", "Stian", "Aksel", "Jørgen", "Sondre", "Kristian", "Petter", "Morten", "Trond", "Sander",
+    "Mikkel", "Jens", "Søren", "Niels", "Mads", "Anders", "Peter", "Kasper", "Frederik", "Christian",
+    "Magnus", "Jonas", "Oliver", "Emil", "Lukas", "Noah", "Viktor", "Albert", "Theo", "Aksel",
+    "Jón", "Sigurður", "Kristján", "Björn", "Ari", "Arnar", "Egill", "Gylfi", "Hannes", "Ingi",
+    "Mikko", "Juha", "Pekka", "Antti", "Jussi", "Kari", "Mika", "Tomi", "Ville", "Ari",
+    "Axel", "Birk", "Calle", "Dag", "Edvin", "Filip", "Gabriel", "Hugo", "Isac", "Jakob"
+  ],
+  "lastNames": [
+    "Andersson", "Johansson", "Karlsson", "Nilsson", "Eriksson", "Larsson", "Olsson", "Persson", "Svensson", "Gustafsson",
+    "Pettersson", "Jonsson", "Jansson", "Hansson", "Bengtsson", "Jönsson", "Lindberg", "Magnusson", "Lindström", "Lindqvist",
+    "Hansen", "Olsen", "Nielsen", "Pedersen", "Jensen", "Kristiansen", "Larsen", "Andersen", "Eriksen", "Berg",
+    "Haugen", "Hagen", "Johansen", "Andreassen", "Solberg", "Jakobsen", "Pettersen", "Bakken", "Karlsen", "Bjerke",
+    "Christensen", "Rasmussen", "Sørensen", "Madsen", "Møller", "Mortensen", "Jørgensen", "Petersen", "Knudsen", "Thomsen",
+    "Holm", "Dahl", "Nyberg", "Berglund", "Sandberg", "Ström", "Ahlberg", "Bergström", "Norberg", "Söderberg",
+    "Jónsson", "Sigurðsson", "Magnússon", "Einarsson", "Guðmundsson", "Þórsson", "Ólafsson", "Bjarnason", "Sveinsson", "Halldórsson",
+    "Korhonen", "Virtanen", "Mäkinen", "Nieminen", "Mäkelä", "Hämäläinen", "Laine", "Heikkinen", "Koskinen", "Järvinen",
+    "Lund", "Ek", "Mårtensson", "Forsberg", "Wallin", "Engström", "Sjöberg", "Hellström", "Backlund", "Lindgren"
+  ],
+  "cities": [
+    "Stockholm", "Göteborg", "Malmö", "Uppsala", "Västerås", "Örebro", "Linköping", "Helsingborg", "Norrköping", "Jönköping",
+    "Oslo", "Bergen", "Trondheim", "Stavanger", "Drammen", "Kristiansand", "Ålesund", "Tromsø", "København", "Aarhus",
+    "Odense", "Aalborg", "Esbjerg", "Reykjavík", "Akureyri", "Helsinki", "Tampere", "Turku", "Espoo", "Vantaa"
+  ],
+  "clubTemplates": [
+    "{city} IF",
+    "{city} BK",
+    "IFK {city}",
+    "{city} FF",
+    "FK {city}",
+    "{city} FK",
+    "BK {city}",
+    "AIK {city}"
+  ]
+}

@@ -215,16 +215,29 @@ src/
 
 ---
 
-## 9. Open questions for the user (the question round)
+## 9. Resolved decisions (question round outcome)
 
-**Q1. Name pools shipping by default.** I propose English, Spanish, German, Italian, French, and a Generic-fictional fallback. Add Portuguese, Dutch, Brazilian, etc., or fewer? Or should I lean entirely on Generic and let you add real country pools later?
+- **Q1 — name pools: 13 macro pools.** `English, German, French, Spanish, Italian, Slavic, Nordic, African, Chinese, Arabic, Turkish, Greek, Japanese`. The macro-region pools (Slavic / Nordic / African) mix names from multiple sub-regions; documented as a known simplification. The "African" pool is a single Sub-Saharan macro pool (not split into West / East-Southern). All pools also act as fallback when no nationality matches.
+- **Q2 — seed visibility: behind an "Advanced ▾" disclosure** in each generator modal. Default flow rerolls per click; power users can paste a seed.
+- **Q3 — squad shape: accepted.** 3 GK, 8 DEF (4 CB / 2 LB / 2 RB), 9 MID (2 CDM / 3 CM / 2 CAM / 1 LM / 1 RM), 5 FWD (1 LW / 1 RW / 3 ST). Total 25.
+- **Q4 — OVR curves: accepted.** Top-tier ≈ 78 (champions ~84, bottom ~72), step −10 per tier; squad curve = 2 stars / 9 regulars / 9 squad / 5 reserves around the club's target.
+- **Q5 — performance budget: ≤30 s** for the acceptance-gate flow (4 × 16 × 25 ≈ 1600 entities). Bigger budget unlocks more calibration passes per stat block and slightly more believable distributions.
 
-**Q2. Determinism / seeds visible to the user.** Should the Generator UI expose a "Seed" field (advanced — paste a string to reproduce a world), or hide seeds entirely (always random per click)?
+### 9.1 Name pool implementation note
 
-**Q3. Squad positional distribution.** Accept the 3 GK / 8 DEF / 9 MID / 5 FWD shape from §3.5, or different? Plan didn't specify; this is one of those "looks reasonable" picks.
+Each pool ships as `src/data/names/<code>.json` and contains:
+- `code`, `displayName`
+- `firstNames`: ~100–150 male-leaning entries (footballers historically male; trivially extensible later)
+- `lastNames`: ~100–150 entries
+- `cities`: ~30–60 entries
+- `clubTemplates`: ~6 templates using `{city}`
 
-**Q4. OVR curves.** Accept the proposed top-tier OVR ≈ 78 (champions ≈ 84, bottom ≈ 72), step −10 per tier (so 4-tier league spans ~78 / 68 / 58 / 48)? Or different starting point / step?
+Sourcing: open-data common-name lists with attribution noted in the JSON header. Macro pools (`slavic`, `nordic`, `african`) interleave names from multiple sub-regions to reflect the "plausibly from this region" intent.
 
-**Q5. Performance budget.** Plan says "under 30 seconds" for 4 tiers × 16 clubs × 25 players ≈ 1600 players. My target: under 5 s on a modern laptop. Is the user willing to accept up to ~10 s if it gets us better-quality output (more calibration passes)?
+### 9.2 Implementation begins
 
-Smaller defaults I'm taking unless you push back: 25-man default squad size (changeable in modal), age curve as in §3.4, generic-fictional always available regardless of country, all generated worlds are mutually independent (no cross-savefile sharing), no procedural progression of stats across seasons (Phase 4/5).
+Per this proposal. Phase 2 ships on `claude/phase-2`; PR opens once the engine compiles.
+
+---
+
+## ~~9. Open questions for the user (the question round)~~ — answered above

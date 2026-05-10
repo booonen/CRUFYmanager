@@ -5,6 +5,7 @@ import { NumberInput } from './NumberInput';
 import { OvrBadge } from './OvrBadge';
 import { PersonalityPicker } from './PersonalityPicker';
 import { PositionPicker } from './PositionPicker';
+import { RandomizeStatsPopover } from './RandomizeStatsPopover';
 import { StatSlider } from './StatSlider';
 import { t } from '../lang';
 import type { DomesticPlayer, GameStat } from '../domain/player';
@@ -182,6 +183,20 @@ export function PlayerFormModal({
         >
           <div className="form-section__heading">{t('players.sections.stats')}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <RandomizeStatsPopover
+              position={form.position}
+              currentOvr={ovr}
+              onApply={({ stats, consistency, workRate, injuryProneness, potential }) =>
+                setForm((f) => ({
+                  ...f,
+                  stats,
+                  consistency,
+                  workRate,
+                  injuryProneness,
+                  potential,
+                }))
+              }
+            />
             <span className="text-dim mono" style={{ fontSize: 11 }}>
               {t('players.fields.ovr')}
             </span>

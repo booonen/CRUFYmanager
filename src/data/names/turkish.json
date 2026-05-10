@@ -1,0 +1,41 @@
+{
+  "code": "turkish",
+  "displayName": "Turkish",
+  "notes": "Common Turkish footballer names.",
+  "firstNames": [
+    "Mehmet", "Mustafa", "Ahmet", "Ali", "Hasan", "Hüseyin", "İbrahim", "İsmail", "Osman", "Yusuf",
+    "Murat", "Emre", "Burak", "Volkan", "Selçuk", "Cenk", "Hakan", "Arda", "Caner", "Tolga",
+    "Berkay", "Çağlar", "Doğan", "Eren", "Ferhat", "Gökhan", "Kerem", "Kaan", "Mert", "Onur",
+    "Oğuz", "Polat", "Recep", "Salih", "Serkan", "Taner", "Uğur", "Yasin", "Yiğit", "Zafer",
+    "Alper", "Berk", "Can", "Deniz", "Efe", "Furkan", "Gürkan", "Halil", "İlker", "Koray",
+    "Levent", "Metin", "Nuri", "Okan", "Ömer", "Özgür", "Pınar", "Ramazan", "Sinan", "Tarık",
+    "Tuncay", "Umut", "Veli", "Yavuz", "Yunus", "Yakup", "Bahattin", "Cevdet", "Davut", "Erdal",
+    "Fatih", "Gökay", "Halit", "İhsan", "Kemal", "Kürşat", "Lokman", "Mahmut", "Mansur", "Necati",
+    "Numan", "Ozan", "Rıza", "Sami", "Sabri", "Tayyip", "Tuğrul", "Vedat", "Yağmur", "Zeki"
+  ],
+  "lastNames": [
+    "Yılmaz", "Kaya", "Demir", "Şahin", "Çelik", "Yıldız", "Yıldırım", "Öztürk", "Aydın", "Özdemir",
+    "Arslan", "Doğan", "Kılıç", "Aslan", "Çetin", "Kara", "Koç", "Kurt", "Özkan", "Şimşek",
+    "Polat", "Korkmaz", "Özer", "Türk", "Bulut", "Erdoğan", "Bozkurt", "Güneş", "Tekin", "Yalçın",
+    "Aksoy", "Acar", "Avcı", "Bayram", "Beyaz", "Çakır", "Demirel", "Deniz", "Erdem", "Gül",
+    "Güler", "İnan", "Karadağ", "Kahraman", "Karaca", "Keskin", "Köse", "Mutlu", "Özçelik", "Pehlivan",
+    "Sağlam", "Sönmez", "Sezer", "Tan", "Tunç", "Uçar", "Ünal", "Üstün", "Yeşil", "Yörük",
+    "Akın", "Atalay", "Bilgin", "Çolak", "Demirtaş", "Erkan", "Ertürk", "Gümüş", "Karakaya", "Karadeniz",
+    "Karaoğlan", "Kayhan", "Korkut", "Madak", "Nazlı", "Ocak", "Pamuk", "Soydan", "Tezcan", "Türkoğlu",
+    "Uysal", "Yamaç", "Yaman", "Yiğit", "Zenginoğlu", "Sarı", "Karaman", "Kahveci", "Calhanoğlu", "Tosun"
+  ],
+  "cities": [
+    "İstanbul", "Ankara", "İzmir", "Bursa", "Adana", "Gaziantep", "Konya", "Antalya", "Kayseri", "Mersin",
+    "Eskişehir", "Diyarbakır", "Samsun", "Denizli", "Şanlıurfa", "Adapazarı", "Malatya", "Kahramanmaraş", "Erzurum", "Van",
+    "Batman", "Elazığ", "Kocaeli", "Manisa", "Sivas", "Balıkesir", "Trabzon", "Ordu", "Hatay", "Tekirdağ"
+  ],
+  "clubTemplates": [
+    "{city}spor",
+    "{city} FK",
+    "{city} Sports",
+    "Real {city}",
+    "Genç {city}",
+    "Süper {city}",
+    "{city} Şehir"
+  ]
+}

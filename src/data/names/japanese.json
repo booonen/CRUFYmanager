@@ -1,0 +1,42 @@
+{
+  "code": "japanese",
+  "displayName": "Japanese",
+  "notes": "Common Japanese footballer names in Romaji.",
+  "firstNames": [
+    "Hiroshi", "Takashi", "Kenji", "Akira", "Daisuke", "Hideki", "Hiroki", "Kazuki", "Kenta", "Koji",
+    "Makoto", "Masahiro", "Mitsuru", "Naoki", "Noboru", "Osamu", "Ryota", "Satoshi", "Shinji", "Shota",
+    "Takashi", "Takeshi", "Tatsuya", "Tomoya", "Toshiya", "Yuji", "Yuki", "Yusuke", "Yuto", "Yuya",
+    "Haruto", "Yuto", "Souta", "Yuma", "Sora", "Yuki", "Aoi", "Hayato", "Riku", "Hinata",
+    "Kaito", "Yusei", "Itsuki", "Hiroto", "Ryo", "Asahi", "Ren", "Tsubasa", "Daiki", "Genki",
+    "Atsushi", "Eito", "Fumiya", "Goro", "Hayato", "Issei", "Junya", "Kazuto", "Keisuke", "Kohei",
+    "Manabu", "Masaki", "Naoto", "Nobuyuki", "Ryusei", "Seiji", "Shinya", "Tatsuhiro", "Tetsuya", "Toshio",
+    "Yoshito", "Yuichi", "Yusaku", "Akihiro", "Bunta", "Chihiro", "Daichi", "Eiji", "Fumihiro", "Gaku",
+    "Haruki", "Ikuo", "Jiro", "Kyosuke", "Mamoru", "Naoyuki", "Otoya", "Reiji", "Shun", "Takuto"
+  ],
+  "lastNames": [
+    "Sato", "Suzuki", "Takahashi", "Tanaka", "Watanabe", "Ito", "Yamamoto", "Nakamura", "Kobayashi", "Kato",
+    "Yoshida", "Yamada", "Sasaki", "Yamaguchi", "Saito", "Matsumoto", "Inoue", "Kimura", "Hayashi", "Shimizu",
+    "Yamazaki", "Mori", "Abe", "Ikeda", "Hashimoto", "Yamashita", "Ishikawa", "Nakajima", "Maeda", "Fujita",
+    "Ogawa", "Goto", "Okada", "Hasegawa", "Murakami", "Kondo", "Ishii", "Saitou", "Sakamoto", "Endo",
+    "Aoki", "Fujii", "Nishimura", "Fukuda", "Ota", "Miura", "Fujimoto", "Okamoto", "Matsuda", "Nakagawa",
+    "Nakano", "Harada", "Ono", "Tamura", "Takeda", "Nakayama", "Ishida", "Morita", "Uchida", "Sugiyama",
+    "Masuda", "Hirano", "Kojima", "Sugawara", "Takagi", "Honda", "Iwasaki", "Onishi", "Imai", "Otsuka",
+    "Yokoyama", "Hirata", "Yokoi", "Tanabe", "Hayakawa", "Iida", "Sasaoka", "Toda", "Tsuchiya", "Kanazawa",
+    "Sakai", "Ichikawa", "Tsuda", "Hattori", "Kuroda", "Higuchi", "Hirose", "Asano", "Iwata", "Tsukamoto"
+  ],
+  "cities": [
+    "Tokyo", "Yokohama", "Osaka", "Nagoya", "Sapporo", "Kobe", "Kyoto", "Fukuoka", "Kawasaki", "Saitama",
+    "Hiroshima", "Sendai", "Chiba", "Kitakyushu", "Sakai", "Niigata", "Hamamatsu", "Kumamoto", "Sagamihara", "Shizuoka",
+    "Okayama", "Kanazawa", "Utsunomiya", "Matsuyama", "Matsumoto", "Naha", "Toyota", "Nagano", "Toyama", "Akita",
+    "Kagoshima", "Aomori", "Morioka", "Iwaki", "Fukushima"
+  ],
+  "clubTemplates": [
+    "{city} FC",
+    "{city} United",
+    "FC {city}",
+    "{city} Antlers",
+    "{city} Reds",
+    "Real {city}",
+    "Sporting {city}"
+  ]
+}

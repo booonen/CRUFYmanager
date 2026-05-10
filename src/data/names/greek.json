@@ -1,0 +1,41 @@
+{
+  "code": "greek",
+  "displayName": "Greek",
+  "notes": "Common Greek footballer names.",
+  "firstNames": [
+    "Giorgos", "Yannis", "Dimitris", "Nikos", "Kostas", "Christos", "Michalis", "Panagiotis", "Vassilis", "Spiros",
+    "Stelios", "Stavros", "Thanos", "Thodoris", "Apostolos", "Antonis", "Andreas", "Angelos", "Athanasios", "Vangelis",
+    "Petros", "Pavlos", "Manolis", "Lefteris", "Lazaros", "Kyriakos", "Konstantinos", "Iordanis", "Ilias", "Haralambos",
+    "Efthymios", "Evangelos", "Eleftherios", "Charalambos", "Anastasios", "Aristotelis", "Christoforos", "Damianos", "Demosthenes", "Doukas",
+    "Filippos", "Fotios", "Gerasimos", "Iakovos", "Isidoros", "Kimonas", "Lambros", "Loukas", "Mathaios", "Markos",
+    "Menelaos", "Miltiadis", "Nektarios", "Nicholas", "Odysseas", "Orestis", "Pantelis", "Periklis", "Pavlos", "Plato",
+    "Polyvios", "Rafail", "Sotirios", "Stathis", "Stamatis", "Tasos", "Theodoros", "Tryfon", "Vagelis", "Vakis",
+    "Yannos", "Zacharias", "Zafiris", "Zois", "Akis", "Babis", "Charis", "Dionysis", "Foivos", "Grigoris",
+    "Haris", "Iason", "Karolos", "Lykourgos", "Makis", "Nestoras", "Olympios", "Phaidon", "Renos", "Themis"
+  ],
+  "lastNames": [
+    "Papadopoulos", "Papandreou", "Papageorgiou", "Karagiannis", "Konstantinidis", "Konstantinou", "Vasileiou", "Nikolaidis", "Nikolopoulos", "Anagnostopoulos",
+    "Antoniadis", "Antoniou", "Ioannidis", "Ioannou", "Christodoulou", "Christou", "Dimitriou", "Demetriou", "Georgiou", "Giannakopoulos",
+    "Giannopoulos", "Spanos", "Stavropoulos", "Theodoropoulos", "Tsirakos", "Vlachos", "Zafiriou", "Apostolou", "Argyros", "Christodoulides",
+    "Diamantopoulos", "Dimopoulos", "Doukas", "Eleftheriou", "Filippou", "Fotopoulos", "Galanopoulos", "Hatzis", "Iliadis", "Kafelidis",
+    "Kapsis", "Karras", "Kavouras", "Klonaridis", "Kontogiannis", "Kotsis", "Koukoulis", "Lazaridis", "Lemonis", "Liapis",
+    "Makrygiannis", "Manolakos", "Martakis", "Matzouranis", "Megaloudis", "Mitropoulos", "Moras", "Mpampakis", "Nasis", "Nikiforos",
+    "Oikonomou", "Panagopoulos", "Panagiotidis", "Papadakis", "Papas", "Papoutsakis", "Paraschos", "Paschalidis", "Paspatis", "Pateras",
+    "Pavlidis", "Petrakis", "Petropoulos", "Pliatsikas", "Politis", "Poulakidas", "Pyrgos", "Raftopoulos", "Rouvas", "Sakaris",
+    "Salpingidis", "Sarakatsanos", "Siatras", "Sklavos", "Smaragdis", "Sotiropoulos", "Stamoulis", "Stergiou", "Tasoulas", "Tziolis"
+  ],
+  "cities": [
+    "Athens", "Thessaloniki", "Patras", "Heraklion", "Larissa", "Volos", "Ioannina", "Trikala", "Chalkida", "Serres",
+    "Alexandroupoli", "Xanthi", "Katerini", "Kalamata", "Kavala", "Chania", "Lamia", "Komotini", "Rethymno", "Tripoli",
+    "Corinth", "Drama", "Veria", "Karditsa", "Agrinio", "Pyrgos", "Kos", "Rhodes", "Mytilene", "Sparta"
+  ],
+  "clubTemplates": [
+    "{city} FC",
+    "AO {city}",
+    "PAS {city}",
+    "Olympiacos {city}",
+    "Asteras {city}",
+    "Atromitos {city}",
+    "Apollon {city}"
+  ]
+}

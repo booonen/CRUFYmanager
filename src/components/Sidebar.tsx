@@ -49,6 +49,7 @@ const NAV: NavGroup[] = [
     headingKey: 'nav.section_system',
     items: [
       { to: '/issues', labelKey: 'nav.issues', icon: '◭', badge: 'issues' },
+      { to: '/generator', labelKey: 'nav.generator', icon: '⚙' },
       { to: '/saves', labelKey: 'nav.saves', icon: '◉' },
     ],
   },

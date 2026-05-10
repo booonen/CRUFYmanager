@@ -1,0 +1,43 @@
+{
+  "code": "spanish",
+  "displayName": "Spanish",
+  "notes": "Castilian and broader Hispanic footballer names.",
+  "firstNames": [
+    "Antonio", "José", "Manuel", "Francisco", "David", "Juan", "Javier", "José Luis", "Carlos", "Daniel",
+    "Miguel", "Alejandro", "Rafael", "Pedro", "Ángel", "Fernando", "Pablo", "Sergio", "Jorge", "Alberto",
+    "Diego", "Adrián", "Iván", "Andrés", "Rubén", "Óscar", "Raúl", "Jesús", "Luis", "Mario",
+    "Iker", "Hugo", "Lucas", "Mateo", "Marcos", "Joaquín", "Ricardo", "Roberto", "Vicente", "Ramón",
+    "Cristian", "Marc", "Aitor", "Arnau", "Bruno", "Cesc", "Borja", "Jaime", "Tomás", "Víctor",
+    "Eduardo", "Esteban", "Felipe", "Gerardo", "Héctor", "Iago", "Joel", "Kike", "Leandro", "Marco",
+    "Nacho", "Octavio", "Pau", "Quique", "Rodrigo", "Saúl", "Tiago", "Unai", "Vidal", "Xabi",
+    "Yago", "Zacarías", "Alfonso", "Asier", "Bautista", "César", "Damián", "Edu", "Fede", "Gonzalo",
+    "Hilario", "Isco", "Joaquín", "Koke", "Lorenzo", "Mikel", "Nico", "Oriol", "Pol", "Roque"
+  ],
+  "lastNames": [
+    "García", "Martínez", "López", "Sánchez", "Pérez", "Rodríguez", "González", "Hernández", "Jiménez", "Ruiz",
+    "Díaz", "Moreno", "Muñoz", "Álvarez", "Romero", "Alonso", "Gutiérrez", "Navarro", "Torres", "Domínguez",
+    "Vázquez", "Ramos", "Gil", "Ramírez", "Serrano", "Blanco", "Molina", "Suárez", "Castro", "Ortega",
+    "Delgado", "Ortiz", "Rubio", "Marín", "Sanz", "Iglesias", "Núñez", "Medina", "Garrido", "Cortés",
+    "Castillo", "Santos", "Lozano", "Guerrero", "Cano", "Prieto", "Méndez", "Cruz", "Calvo", "Gallego",
+    "Vidal", "León", "Márquez", "Herrera", "Peña", "Flores", "Cabrera", "Campos", "Vega", "Fuentes",
+    "Carrasco", "Diez", "Reyes", "Caballero", "Nieto", "Aguilar", "Pascual", "Santana", "Herrero", "Lorenzo",
+    "Hidalgo", "Giménez", "Ibáñez", "Ferrer", "Durán", "Santiago", "Vargas", "Velasco", "Mora", "Soler",
+    "Esteban", "Bravo", "Gallardo", "Rojas", "Pardo", "Salas", "Carmona", "Soto", "Carrillo", "Crespo"
+  ],
+  "cities": [
+    "Madrid", "Barcelona", "Valencia", "Sevilla", "Zaragoza", "Málaga", "Murcia", "Palma", "Bilbao", "Alicante",
+    "Córdoba", "Valladolid", "Vigo", "Gijón", "L'Hospitalet", "Vitoria", "A Coruña", "Granada", "Elche", "Oviedo",
+    "Pamplona", "Cádiz", "Cartagena", "Almería", "Burgos", "Salamanca", "Albacete", "Huelva", "Logroño", "Badajoz",
+    "Castellón", "Lugo", "Tarragona", "Toledo", "Lleida", "Cáceres", "Mérida"
+  ],
+  "clubTemplates": [
+    "Real {city}",
+    "Atlético {city}",
+    "{city} CF",
+    "CD {city}",
+    "Deportivo {city}",
+    "Real Club {city}",
+    "Sporting de {city}",
+    "RCD {city}"
+  ]
+}

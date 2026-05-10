@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from './Button';
 import { ClubLogo } from './ClubLogo';
 import { ConfirmModal } from './ConfirmModal';
+import { GenerateSquadModal } from './GenerateSquadModal';
 import { ManagerAssignModal } from './ManagerAssignModal';
 import { OvrBadge } from './OvrBadge';
 import { PositionPill } from './PositionPill';
@@ -34,6 +35,7 @@ export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
   const [assigningManager, setAssigningManager] = useState(false);
   const [sacking, setSacking] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
+  const [generatingSquad, setGeneratingSquad] = useState(false);
 
   if (!calendar) return null;
 
@@ -144,9 +146,14 @@ export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
             {t('clubs.detail.squad')} ({sortedSquad.length})
           </div>
           {!isFreeAgents ? (
-            <Button size="sm" onClick={() => setAddingPlayer(true)}>
-              {t('clubs.detail.addPlayer')}
-            </Button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Button size="sm" onClick={() => setGeneratingSquad(true)}>
+                {t('generateSquad.button')}
+              </Button>
+              <Button size="sm" onClick={() => setAddingPlayer(true)}>
+                {t('clubs.detail.addPlayer')}
+              </Button>
+            </div>
           ) : null}
         </div>
 
@@ -205,6 +212,12 @@ export function ClubDetail({ club, squad, onEdit, onDelete }: ClubDetailProps) {
           }}
         />
       ) : null}
+
+      <GenerateSquadModal
+        open={generatingSquad}
+        club={club}
+        onClose={() => setGeneratingSquad(false)}
+      />
 
       <PlayerFormModal
         open={addingPlayer}
