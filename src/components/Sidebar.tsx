@@ -1,11 +1,13 @@
 import { NavLink } from 'react-router-dom';
 import { t } from '../lang';
+import { useIssueCount } from '../routes/Issues';
 
 interface NavItem {
   to: string;
   labelKey: string;
   icon: string;
   end?: boolean;
+  badge?: 'issues';
 }
 
 interface NavGroup {
@@ -16,7 +18,10 @@ interface NavGroup {
 const NAV: NavGroup[] = [
   {
     headingKey: 'nav.section_overview',
-    items: [{ to: '/dashboard', labelKey: 'nav.dashboard', icon: '◈' }],
+    items: [
+      { to: '/dashboard', labelKey: 'nav.dashboard', icon: '◈' },
+      { to: '/issues', labelKey: 'nav.issues', icon: '◭', badge: 'issues' },
+    ],
   },
   {
     headingKey: 'nav.section_main',
@@ -50,6 +55,8 @@ const NAV: NavGroup[] = [
 ];
 
 export function Sidebar() {
+  const issueCount = useIssueCount();
+
   return (
     <nav className="sidebar">
       {NAV.map((group) => (
@@ -66,6 +73,9 @@ export function Sidebar() {
             >
               <span className="nav-item__icon">{item.icon}</span>
               <span>{t(item.labelKey)}</span>
+              {item.badge === 'issues' && issueCount > 0 ? (
+                <span className="nav-item__badge mono">{issueCount}</span>
+              ) : null}
             </NavLink>
           ))}
         </div>

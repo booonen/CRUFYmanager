@@ -6,6 +6,7 @@ export const en = {
   nav: {
     section_overview: 'Overview',
     dashboard: 'Dashboard',
+    issues: 'Issues',
     section_main: 'World',
     calendar: 'Calendar',
     competitions: 'Competitions',
@@ -25,8 +26,6 @@ export const en = {
   dashboard: {
     welcome: 'Welcome to {country}',
     sub: 'Build out clubs, squads, and managers manually. Procedural generation arrives in Phase 2.',
-    overviewTab: 'Overview',
-    issuesTab: 'Issues',
     stats: {
       season: 'Season',
       matchday: 'Matchday',
@@ -36,8 +35,11 @@ export const en = {
       competitions: 'Competitions',
       fixtures: 'Fixtures (season)',
     },
-    issues: {
-      none: 'No issues. Clubs are appropriately staffed and have managers.',
+  },
+  issues: {
+    sub: 'Squad coverage and roster integrity warnings. Click an issue to jump to the club.',
+    none: 'No issues. Clubs are appropriately staffed and have managers.',
+    kind: {
       under: '{name} has {count} players — under the 11-player minimum.',
       over: '{name} has {count} players — over the 30-player soft cap.',
       noManager: '{name} has no manager assigned.',
