@@ -1,11 +1,13 @@
 import { NavLink } from 'react-router-dom';
 import { t } from '../lang';
+import { useIssueCount } from '../routes/Issues';
 
 interface NavItem {
   to: string;
   labelKey: string;
   icon: string;
   end?: boolean;
+  badge?: 'issues';
 }
 
 interface NavGroup {
@@ -25,6 +27,7 @@ const NAV: NavGroup[] = [
       { to: '/competitions', labelKey: 'nav.competitions', icon: '◇' },
       { to: '/clubs', labelKey: 'nav.clubs', icon: '◎' },
       { to: '/players', labelKey: 'nav.players', icon: '◐' },
+      { to: '/managers', labelKey: 'nav.managers', icon: '◑' },
     ],
   },
   {
@@ -43,12 +46,17 @@ const NAV: NavGroup[] = [
     items: [{ to: '/world', labelKey: 'nav.world', icon: '◌' }],
   },
   {
-    headingKey: 'nav.section_save',
-    items: [{ to: '/saves', labelKey: 'nav.saves', icon: '◉' }],
+    headingKey: 'nav.section_system',
+    items: [
+      { to: '/issues', labelKey: 'nav.issues', icon: '◭', badge: 'issues' },
+      { to: '/saves', labelKey: 'nav.saves', icon: '◉' },
+    ],
   },
 ];
 
 export function Sidebar() {
+  const issueCount = useIssueCount();
+
   return (
     <nav className="sidebar">
       {NAV.map((group) => (
@@ -65,6 +73,9 @@ export function Sidebar() {
             >
               <span className="nav-item__icon">{item.icon}</span>
               <span>{t(item.labelKey)}</span>
+              {item.badge === 'issues' && issueCount > 0 ? (
+                <span className="nav-item__badge mono">{issueCount}</span>
+              ) : null}
             </NavLink>
           ))}
         </div>

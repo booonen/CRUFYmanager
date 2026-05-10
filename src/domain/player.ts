@@ -1,49 +1,80 @@
 import type { CalendarDate } from './calendar';
 
-export type Position =
-  | 'GK'
-  | 'DEF-CB'
-  | 'DEF-FB'
-  | 'MID-DM'
-  | 'MID-CM'
-  | 'MID-AM'
-  | 'FWD-W'
-  | 'FWD-ST';
+export const POSITIONS = [
+  'GK',
+  'DEF-CB',
+  'DEF-LB',
+  'DEF-RB',
+  'MID-CDM',
+  'MID-CM',
+  'MID-CAM',
+  'MID-LM',
+  'MID-RM',
+  'FWD-LW',
+  'FWD-RW',
+  'FWD-ST',
+] as const;
 
-export type PreferredFoot = 'L' | 'R' | 'Both';
+export type Position = (typeof POSITIONS)[number];
 
-export type PersonalityTag =
-  | 'Professional'
-  | 'Mercurial'
-  | 'Loyal'
-  | 'Ambitious'
-  | 'Hothead'
-  | 'Leader'
-  | 'Quiet'
-  | 'Showboat';
+export const POSITION_GROUPS = {
+  GK: ['GK'],
+  DEF: ['DEF-CB', 'DEF-LB', 'DEF-RB'],
+  MID: ['MID-CDM', 'MID-CM', 'MID-CAM', 'MID-LM', 'MID-RM'],
+  FWD: ['FWD-LW', 'FWD-RW', 'FWD-ST'],
+} as const satisfies Record<string, readonly Position[]>;
+
+export const PERSONALITY_TAGS = [
+  'Professional',
+  'Mercurial',
+  'Loyal',
+  'Ambitious',
+  'Hothead',
+  'Leader',
+  'Quiet',
+  'Showboat',
+  'Selfish',
+  'Dedicated',
+  'Casual',
+  'Influential',
+] as const;
+
+export type PersonalityTag = (typeof PERSONALITY_TAGS)[number];
 
 export type PlayerTier = 'domestic' | 'foreign-resident' | 'foreign-nt-stub';
 
-export interface FullPlayerStats {
-  pace: number;
-  finishing: number;
-  passing: number;
-  dribbling: number;
-  defending: number;
-  heading: number;
-  goalkeeping: number;
-  vision: number;
-  physicality: number;
-  technique: number;
+export const OUTFIELD_GAME_STATS = [
+  'pace',
+  'finishing',
+  'passing',
+  'dribbling',
+  'defending',
+  'heading',
+  'vision',
+  'physicality',
+  'technique',
+] as const;
 
+export const GK_GAME_STATS = ['handling', 'reflexes', 'kicking'] as const;
+
+export const ALL_GAME_STATS = [...OUTFIELD_GAME_STATS, ...GK_GAME_STATS] as const;
+
+export type GameStat = (typeof ALL_GAME_STATS)[number];
+
+export type GameStatBlock = Record<GameStat, number>;
+
+export interface FullPlayerStats extends GameStatBlock {
   injuryProneness: number;
   potential: number;
-  personality: PersonalityTag;
+  personalities: PersonalityTag[];
   consistency: number;
   workRate: number;
 
   ovr: number;
 }
+
+export const MIN_PERSONALITIES = 1;
+export const MAX_PERSONALITIES = 3;
 
 export interface Injury {
   description: string;
@@ -65,11 +96,19 @@ export interface CareerEntry {
 interface PlayerCommon {
   id: string;
   tier: PlayerTier;
-  name: string;
+  firstName: string;
+  lastName: string;
   nationality: string;
   position: Position;
-  preferredFoot: PreferredFoot;
   dateOfBirth: CalendarDate;
+}
+
+export function displayName(player: { firstName: string; lastName: string }): string {
+  const f = player.firstName.trim();
+  const l = player.lastName.trim();
+  if (!f) return l;
+  if (!l) return f;
+  return `${f} ${l}`;
 }
 
 export interface DomesticPlayer extends PlayerCommon {

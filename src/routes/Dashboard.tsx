@@ -4,6 +4,7 @@ import { EmptyState } from '../components/EmptyState';
 import { PageHeading } from '../components/PageHeading';
 import { t } from '../lang';
 import { useSavefileStore } from '../stores/savefile';
+import { isRealClub } from '../utils/freeAgents';
 
 export function DashboardRoute() {
   const status = useSavefileStore((s) => s.status);
@@ -24,16 +25,18 @@ export function DashboardRoute() {
     );
   }
 
+  const realClubs = savefile.clubs.filter(isRealClub);
   const fixtureCount = savefile.calendar.schedule.reduce(
     (sum, slot) => sum + slot.fixtures.length,
     0,
   );
+  const domesticPlayerCount = savefile.players.filter((p) => p.tier === 'domestic').length;
 
   const stats: { label: string; value: string | number }[] = [
     { label: t('dashboard.stats.season'), value: savefile.calendar.currentSeason },
     { label: t('dashboard.stats.matchday'), value: savefile.calendar.currentMatchday },
-    { label: t('dashboard.stats.clubs'), value: savefile.clubs.length },
-    { label: t('dashboard.stats.players'), value: savefile.players.length },
+    { label: t('dashboard.stats.clubs'), value: realClubs.length },
+    { label: t('dashboard.stats.players'), value: domesticPlayerCount },
     { label: t('dashboard.stats.managers'), value: savefile.managers.length },
     { label: t('dashboard.stats.competitions'), value: savefile.competitions.length },
     { label: t('dashboard.stats.fixtures'), value: fixtureCount },

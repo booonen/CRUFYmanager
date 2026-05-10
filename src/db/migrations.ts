@@ -3,6 +3,10 @@ import { SCHEMA_VERSION } from '../domain/savefile';
 
 export type Migration = (savefile: Savefile) => Savefile;
 
+// No registered migrations yet. Phase 1 is still in active development —
+// the schema is mutating freely; in-flight saves don't need to be preserved.
+// When CRUFY ships publicly the next breaking change will register the
+// first real migration here and bump SCHEMA_VERSION.
 const migrations: Record<number, Migration> = {};
 
 export function migrate(savefile: Savefile): Savefile {

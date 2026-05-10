@@ -5,6 +5,7 @@ import type { NationalTeam } from './nationalTeam';
 import type { Savefile } from './savefile';
 import { SCHEMA_VERSION } from './savefile';
 import { DEFAULT_SETTINGS } from './settings';
+import { makeFreeAgentsClub } from '../utils/freeAgents';
 
 export interface NewSavefileInput {
   countryName: string;
@@ -55,7 +56,7 @@ export function createBlankSavefile(input: NewSavefileInput): Savefile {
     },
     calendar: emptyCalendar(input.matchdaysPerSeason),
     competitions: [],
-    clubs: [],
+    clubs: [makeFreeAgentsClub()],
     players: [],
     managers: [],
     nationalTeam: emptyNationalTeam(),

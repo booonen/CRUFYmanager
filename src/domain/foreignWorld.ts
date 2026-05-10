@@ -13,6 +13,7 @@ export interface ForeignClub {
   leagueId: string;
   countryName: string;
   ovr: number;
+  logoUrl: string | null;
 }
 
 export interface ForeignNT {
@@ -22,6 +23,7 @@ export interface ForeignNT {
   ovr: number;
   formation: Formation;
   tactics: TacticalProfile;
+  flagUrl: string | null;
 }
 
 export interface ForeignWorld {
