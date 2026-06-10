@@ -228,14 +228,16 @@ export function CompetitionStageView({ sf, competition, event, stage, stageIndex
       </div>
       </div>
 
-      <GroupDrawModal
-        open={drawOpen}
-        sf={sf}
-        event={event}
-        stage={stage}
-        stageRef={stageRef}
-        onClose={() => setDrawOpen(false)}
-      />
+      {isGroups ? (
+        <GroupDrawModal
+          open={drawOpen}
+          sf={sf}
+          event={event}
+          stage={stage}
+          stageRef={stageRef}
+          onClose={() => setDrawOpen(false)}
+        />
+      ) : null}
       <ManualTieOrderModal
         open={tieTarget !== null}
         sf={sf}

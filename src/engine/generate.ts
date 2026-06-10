@@ -443,6 +443,9 @@ export function createCompetitionFromSpec(spec: CompetitionSpec): Competition {
  * stored-seed semantics apply to results only (plan §1.3).
  */
 export function pottedDraw(entries: Entry[], groupCount: number): string[][] {
+  if (groupCount < 1) {
+    throw new Error('pottedDraw needs at least one group');
+  }
   const ordered = orderEntriesBySeeding(entries).map((e) => e.id);
   const groups: string[][] = Array.from({ length: groupCount }, () => []);
   for (let potStart = 0; potStart < ordered.length; potStart += groupCount) {

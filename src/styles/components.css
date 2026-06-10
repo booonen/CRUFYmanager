@@ -1198,3 +1198,47 @@
   background: var(--accent-glow);
   color: var(--accent);
 }
+
+/* Round → calendar matchday pill */
+
+.md-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-input);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  cursor: text;
+  transition: border-color var(--transition);
+}
+
+.md-chip:focus-within {
+  border-color: var(--border-focus);
+}
+
+.md-chip__input {
+  width: 30px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+  padding: 0;
+  outline: none;
+}
+
+.md-chip__input::-webkit-outer-spin-button,
+.md-chip__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.md-chip__input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}

@@ -184,22 +184,16 @@ export function RoundCard({ sf, event, stage, round, stageRef }: RoundCardProps)
       <div className="round-card__head">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ fontWeight: 600 }}>{round.name}</div>
-          <span
-            className="mono"
-            style={{ fontSize: 10, color: 'var(--text-muted)' }}
-            title={t('calendar.mdHint')}
-          >
-            {t('calendar.mdBadge')}
-          </span>
-          <NumberInput
-            className="input"
-            style={{ width: 52, padding: '2px 4px', fontSize: 11 }}
-            value={round.calendarMatchday ?? 0}
-            min={0}
-            max={sf.calendar.matchdaysPerSeason}
-            title={t('calendar.mdHint')}
-            onCommit={(v) => run(setRoundMatchdayAction({ ...stageRef, roundId: round.id }, v === 0 ? null : v))}
-          />
+          <label className="md-chip" title={t('calendar.mdHint')}>
+            <span>{t('calendar.mdBadge')}</span>
+            <NumberInput
+              className="md-chip__input"
+              value={round.calendarMatchday ?? 0}
+              min={0}
+              max={sf.calendar.matchdaysPerSeason}
+              onCommit={(v) => run(setRoundMatchdayAction({ ...stageRef, roundId: round.id }, v === 0 ? null : v))}
+            />
+          </label>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {allPublished ? (

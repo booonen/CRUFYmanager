@@ -30,7 +30,12 @@ export function GroupDrawModal({ open, sf, event, stage, stageRef, onClose }: Gr
     }
   }, [open]);
 
+  // Everything below assumes a groups stage; compute nothing while closed
+  // (this component stays mounted from the stage view regardless of stage kind,
+  // and a zero group count would otherwise loop forever building pots).
   const groupCount = stage.groups.length;
+  if (!open || groupCount < 1) return null;
+
   const ordered = orderEntriesBySeeding(event.entries);
   const pots: string[][] = [];
   for (let i = 0; i < ordered.length; i += groupCount) {
