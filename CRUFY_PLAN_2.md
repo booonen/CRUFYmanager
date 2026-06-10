@@ -369,6 +369,11 @@ Locked (schema): 9 outfield + 3 GK-only game stats; 12 personality tags, 1–3 p
 Locked (UX): modal confirms only; `<NumberInput>` commit-on-blur; list→profile routes for clubs/players; clickable squad rows; random kit palette; vertical color picker; 7-tier OVR color scale (inverted for injury proneness); sidebar sections Overview/World/Country/Records/Beyond/System; Issues as sidebar route with count badge; nationality defaults to savefile country.
 Policy: in-development schema changes mutate the v1 baseline; no per-change migrations until first public release.
 
+### Phase 2 — implemented 2026-06-10, gate verification pending · proposal: [`docs/phases/phase-2.md`](docs/phases/phase-2.md)
+Question round resolved (proposal §9): scope & §10 reordering ratified; **scheduling concept dropped** — every competition is free-running, the season calendar's fate moved to Phase 5's round; **tiebreaker default points → GD → H2H, GF never in defaults** (NS convention; `'h2h'` = composite mini-table points→GD); **manual + potted draw** both shipped.
+Implementation landed on `claude/affectionate-heisenberg-9bln2f` (commit `2e89e8b`): spine domain (`src/domain/spine/`), pure engines (`src/engine/` — projections, RR scheduler, tables, brackets with stable feeds, declarative qualification, publish guard, integrity warnings, generator + potted draw), cockpit UI (wizard with bulk paste, stage tabs, live standings, bracket view, fast score entry, AET/pens, publish/unlock, group draw, stage rules, manual lots, BBCode copy), Issues integration. 41 engine tests incl. an automated gate rehearsal; 72 total green. Implementation-level deviations logged in proposal §10 (notably: explicit `Stage.bracket` wiring with never-rewritten feeds; byes for non-power-of-two knockouts; entries fixed once generated in this phase).
+**Outstanding before the phase closes:** the §6 manual gate checklist on the deployed Pages site, then merge + this log's final entry.
+
 ### Replan — 2026-06-10 (this document)
 - User brief reframed CRUFY around the NS scorinator workflow; question round ratified the four decisions in §1 (lock-on-publish; scale-agnostic additive Bonus; per-savefile randomness with fresh stored seeds; all four sport families eventually, taxonomy baked in now).
 - `CRUFY_PLAN_2.md` becomes canonical; plan 1 marked superseded.
