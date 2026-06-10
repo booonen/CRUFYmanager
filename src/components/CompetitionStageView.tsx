@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Savefile } from '../domain/savefile';
-import type { Competition, Round, SportEvent, Stage } from '../domain/spine';
+import type { Competition, SportEvent, Stage } from '../domain/spine';
 import type { StageRef } from '../engine/mutate';
+import { STATUS_GLYPH, compactRoundLabel, roundStatus } from '../engine/calendar';
 import {
   computeGroupTablesThrough,
   computeOverallTableThrough,
@@ -26,6 +27,8 @@ interface CompetitionStageViewProps {
   event: SportEvent;
   stage: Stage;
   stageIndex: number;
+  /** Deep-link target (e.g. from the calendar): focus this round on mount/update. */
+  initialFocusRoundId?: string | null;
 }
 
 type TbPreset = 'default' | 'h2hFirst' | 'withGf';
@@ -43,31 +46,14 @@ function presetOf(stage: Stage): TbPreset {
   return 'default';
 }
 
-type RoundStatus = 'empty' | 'partial' | 'complete' | 'published';
-
-function roundStatus(round: Round): RoundStatus {
-  const playable = round.fixtures.filter((fx) => !fx.isBye);
-  if (playable.length === 0) return 'complete';
-  const withResult = playable.filter((fx) => fx.result !== null);
-  if (withResult.length === 0) return 'empty';
-  if (withResult.length < playable.length) return 'partial';
-  return playable.every((fx) => fx.result?.lifecycle.status === 'published') ? 'published' : 'complete';
-}
-
-const STATUS_GLYPH: Record<RoundStatus, string> = {
-  empty: '○',
-  partial: '◐',
-  complete: '●',
-  published: '✓',
-};
-
-function compactLabel(stage: Stage, round: Round): string {
-  return stage.format.kind === 'league' || stage.format.kind === 'groups'
-    ? `MD${round.index + 1}`
-    : round.name;
-}
-
-export function CompetitionStageView({ sf, competition, event, stage, stageIndex }: CompetitionStageViewProps) {
+export function CompetitionStageView({
+  sf,
+  competition,
+  event,
+  stage,
+  stageIndex,
+  initialFocusRoundId,
+}: CompetitionStageViewProps) {
   const stageRef: StageRef = { competitionId: competition.id, eventId: event.id, stageId: stage.id };
   const [drawOpen, setDrawOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -78,7 +64,10 @@ export function CompetitionStageView({ sf, competition, event, stage, stageIndex
   const isGroups = stage.format.kind === 'groups';
 
   // Matchday focus: the host steps through the schedule at their own pace.
-  const [focusedRoundId, setFocusedRoundId] = useState<string | null>(null);
+  const [focusedRoundId, setFocusedRoundId] = useState<string | null>(initialFocusRoundId ?? null);
+  useEffect(() => {
+    if (initialFocusRoundId) setFocusedRoundId(initialFocusRoundId);
+  }, [initialFocusRoundId]);
   const focusedRound = useMemo(() => {
     const byId = stage.rounds.find((r) => r.id === focusedRoundId);
     if (byId) return byId;
@@ -135,7 +124,7 @@ export function CompetitionStageView({ sf, competition, event, stage, stageIndex
               onClick={() => setFocusedRoundId(round.id)}
             >
               <span className={`round-rail__glyph round-rail__glyph--${status}`}>{STATUS_GLYPH[status]}</span>
-              {compactLabel(stage, round)}
+              {compactRoundLabel(stage, round)}
             </button>
           );
         })}

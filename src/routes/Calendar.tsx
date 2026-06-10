@@ -1,18 +1,74 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo, useState, type DragEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeading } from '../components/PageHeading';
-import { RoundCard } from '../components/RoundCard';
-import { matchdayIndex, unscheduledRounds, type CalendarSlotEntry } from '../engine/calendar';
+import {
+  STATUS_GLYPH,
+  compactRoundLabel,
+  matchdayIndex,
+  roundStatus,
+  unscheduledRounds,
+  type CalendarSlotEntry,
+} from '../engine/calendar';
+import type { RoundRef } from '../engine/mutate';
 import { t } from '../lang';
-import { advanceMatchday, setCurrentMatchday } from '../stores/calendar';
+import { advanceMatchday } from '../stores/calendar';
+import { setRoundMatchdayAction } from '../stores/competitions';
 import { useSavefileStore } from '../stores/savefile';
+import { SPORT_ICON } from '../utils/sport';
+
+const DRAG_MIME = 'application/x-crufy-round';
+
+function dragPayload(entry: CalendarSlotEntry): string {
+  const ref: RoundRef = {
+    competitionId: entry.competition.id,
+    eventId: entry.event.id,
+    stageId: entry.stage.id,
+    roundId: entry.round.id,
+  };
+  return JSON.stringify(ref);
+}
+
+function parseDrop(e: DragEvent): RoundRef | null {
+  const raw = e.dataTransfer.getData(DRAG_MIME);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as RoundRef;
+  } catch {
+    return null;
+  }
+}
+
+function RoundChip({ entry, onOpen }: { entry: CalendarSlotEntry; onOpen: () => void }) {
+  const status = roundStatus(entry.round);
+  return (
+    <div
+      className="cal-round"
+      draggable
+      title={`${entry.competition.name} — ${entry.stage.name} · ${entry.round.name}`}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG_MIME, dragPayload(entry));
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen();
+      }}
+    >
+      <span className="cal-round__sport">{SPORT_ICON[entry.event.sport]}</span>
+      <span className="mono cal-round__comp">{entry.competition.shortName}</span>
+      <span className="cal-round__label">{compactRoundLabel(entry.stage, entry.round)}</span>
+      <span className={`cal-round__status round-rail__glyph--${status}`}>{STATUS_GLYPH[status]}</span>
+    </div>
+  );
+}
 
 export function CalendarRoute() {
   const status = useSavefileStore((s) => s.status);
   const savefile = useSavefileStore((s) => s.savefile);
-  const [selectedMd, setSelectedMd] = useState<number | null>(null);
+  const navigate = useNavigate();
+  const [dropTarget, setDropTarget] = useState<number | 'tray' | null>(null);
 
   const index = useMemo(
     () => (savefile ? matchdayIndex(savefile) : new Map<number, CalendarSlotEntry[]>()),
@@ -36,9 +92,17 @@ export function CalendarRoute() {
   }
 
   const calendar = savefile.calendar;
-  const selected = selectedMd ?? calendar.currentMatchday;
-  const selectedEntries = index.get(selected) ?? [];
   const days = Array.from({ length: calendar.matchdaysPerSeason }, (_, i) => i + 1);
+
+  const openCompetition = (entry: CalendarSlotEntry) =>
+    navigate(`/competitions/${entry.competition.id}?stage=${entry.stage.id}&round=${entry.round.id}`);
+
+  const handleDrop = (e: DragEvent, target: number | null) => {
+    e.preventDefault();
+    setDropTarget(null);
+    const ref = parseDrop(e);
+    if (ref) setRoundMatchdayAction(ref, target);
+  };
 
   return (
     <>
@@ -46,125 +110,84 @@ export function CalendarRoute() {
         title={t('nav.calendar')}
         sub={t('calendar.sub', { season: calendar.currentSeason, md: calendar.currentMatchday })}
         actions={
-          <div style={{ display: 'flex', gap: 6 }}>
-            <Button size="sm" onClick={() => setSelectedMd(calendar.currentMatchday)}>
-              {t('calendar.jumpToCurrent')}
-            </Button>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => {
-                advanceMatchday();
-                setSelectedMd(null); // selection follows the current matchday
-              }}
-            >
-              {t('calendar.advance')}
-            </Button>
-          </div>
+          <Button size="sm" variant="primary" onClick={advanceMatchday}>
+            {t('calendar.advance')}
+          </Button>
         }
       />
+
+      {savefile.competitions.length === 0 ? (
+        <div className="panel" style={{ padding: 16, color: 'var(--text-dim)', fontSize: 13, marginBottom: 12 }}>
+          {t('calendar.noSchedule')}
+        </div>
+      ) : null}
 
       <div className="cal-grid">
         {days.map((md) => {
           const entries = index.get(md) ?? [];
           const isCurrent = md === calendar.currentMatchday;
-          const isSelected = md === selected;
-          const compNames = [...new Set(entries.map((e) => e.competition.shortName))];
           return (
-            <button
+            <div
               key={md}
-              type="button"
               className={[
                 'cal-cell',
                 isCurrent ? 'cal-cell--current' : '',
-                isSelected ? 'cal-cell--selected' : '',
                 entries.length > 0 ? 'cal-cell--busy' : '',
+                dropTarget === md ? 'cal-cell--dropover' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
-              onClick={() => setSelectedMd(md)}
-              onDoubleClick={() => setCurrentMatchday(md)}
-              title={isCurrent ? t('calendar.current') : t('calendar.cellHint')}
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate(`/calendar/${md}`)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') navigate(`/calendar/${md}`);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                setDropTarget(md);
+              }}
+              onDragLeave={() => setDropTarget((cur) => (cur === md ? null : cur))}
+              onDrop={(e) => handleDrop(e, md)}
             >
-              <span className="mono cal-cell__md">{md}</span>
-              <span className="cal-cell__chips">
-                {compNames.map((name) => (
-                  <span key={name} className="cal-cell__chip mono">
-                    {name}
-                  </span>
+              <div className="cal-cell__head">
+                <span className="mono cal-cell__md">{md}</span>
+                {isCurrent ? <span className="cal-cell__now">{t('calendar.current')}</span> : null}
+              </div>
+              <div className="cal-cell__rounds">
+                {entries.map((entry) => (
+                  <RoundChip key={entry.round.id} entry={entry} onOpen={() => openCompetition(entry)} />
                 ))}
-              </span>
-            </button>
+              </div>
+            </div>
           );
         })}
       </div>
 
-      <div style={{ marginTop: 18 }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>
-          {t('calendar.onMatchday', { md: selected })}
-          {selected === calendar.currentMatchday ? (
-            <span className="chip chip--active" style={{ marginLeft: 8, fontSize: 10 }}>
-              {t('calendar.current')}
-            </span>
-          ) : null}
+      <div
+        className={`cal-tray ${dropTarget === 'tray' ? 'cal-tray--dropover' : ''}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          setDropTarget('tray');
+        }}
+        onDragLeave={() => setDropTarget((cur) => (cur === 'tray' ? null : cur))}
+        onDrop={(e) => handleDrop(e, null)}
+      >
+        <div className="cal-tray__title">
+          {t('calendar.unscheduled')}
+          <span className="cal-tray__hint">{t('calendar.trayHint')}</span>
         </div>
-
-        {selectedEntries.length === 0 ? (
-          <div className="panel" style={{ padding: 16, color: 'var(--text-dim)', fontSize: 13 }}>
-            {savefile.competitions.length === 0 ? t('calendar.noSchedule') : t('calendar.emptyDay')}
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 720 }}>
-            {selectedEntries.map((entry) => (
-              <div key={entry.round.id}>
-                <Link
-                  to={`/competitions/${entry.competition.id}`}
-                  style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none' }}
-                >
-                  {entry.competition.name} — {entry.stage.name}
-                </Link>
-                <RoundCard
-                  sf={savefile}
-                  event={entry.event}
-                  stage={entry.stage}
-                  round={entry.round}
-                  stageRef={{
-                    competitionId: entry.competition.id,
-                    eventId: entry.event.id,
-                    stageId: entry.stage.id,
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {unscheduled.length > 0 ? (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 13, color: 'var(--warn)' }}>
-              {t('calendar.unscheduled')}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {unscheduled.map((entry) => (
-                <Link
-                  key={entry.round.id}
-                  to={`/competitions/${entry.competition.id}`}
-                  className="list-row"
-                  style={{ textDecoration: 'none' }}
-                >
-                  <span className="mono" style={{ fontSize: 11, color: 'var(--accent)' }}>
-                    {entry.competition.shortName}
-                  </span>
-                  <div className="list-row__main">
-                    <div className="list-row__title" style={{ color: 'var(--text)', fontSize: 13 }}>
-                      {entry.stage.name} · {entry.round.name}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        <div className="cal-tray__items">
+          {unscheduled.length === 0 ? (
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
+          ) : (
+            unscheduled.map((entry) => (
+              <RoundChip key={entry.round.id} entry={entry} onOpen={() => openCompetition(entry)} />
+            ))
+          )}
+        </div>
       </div>
     </>
   );

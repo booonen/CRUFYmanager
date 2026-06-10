@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { CompetitionStageView } from '../components/CompetitionStageView';
 import { EmptyState } from '../components/EmptyState';
@@ -14,9 +14,17 @@ import { entryDisplay } from '../utils/participants';
 
 export function CompetitionDetailRoute() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const stageParam = searchParams.get('stage');
+  const roundParam = searchParams.get('round');
   const savefile = useSavefileStore((s) => s.savefile);
   const competition = useCompetition(id);
   const [activeTab, setActiveTab] = useState<string | null>(null);
+
+  // Deep links from the calendar pick the stage tab (and the focused round below).
+  useEffect(() => {
+    if (stageParam) setActiveTab(stageParam);
+  }, [stageParam, roundParam]);
 
   if (!savefile || !competition) {
     return (
@@ -35,7 +43,7 @@ export function CompetitionDetailRoute() {
   const event = competition.sportEvents[0];
   if (!event) return null;
 
-  const tab = activeTab ?? event.stages[0]?.id ?? 'entries';
+  const tab = activeTab ?? stageParam ?? event.stages[0]?.id ?? 'entries';
 
   return (
     <>
@@ -85,6 +93,7 @@ export function CompetitionDetailRoute() {
               event={event}
               stage={stage}
               stageIndex={stageIndex}
+              initialFocusRoundId={stage.id === stageParam ? roundParam : null}
             />
           );
         })()

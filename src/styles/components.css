@@ -1242,3 +1242,194 @@
   appearance: textfield;
   -moz-appearance: textfield;
 }
+
+/* Calendar v2: full-screen planning grid */
+
+.cal-grid {
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.cal-cell {
+  min-height: 96px;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.cal-cell__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.cal-cell__now {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+.cal-cell__rounds {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.cal-cell--dropover {
+  border-style: dashed;
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.cal-round {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  font-size: 10px;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  cursor: grab;
+  transition: border-color var(--transition);
+}
+
+.cal-round:hover {
+  border-color: var(--accent);
+}
+
+.cal-round:active {
+  cursor: grabbing;
+}
+
+.cal-round__sport {
+  font-size: 10px;
+}
+
+.cal-round__comp {
+  color: var(--accent);
+  font-size: 9px;
+}
+
+.cal-round__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+.cal-round__status {
+  font-size: 9px;
+}
+
+.cal-tray {
+  margin-top: 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+.cal-tray--dropover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.cal-tray__title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.cal-tray__hint {
+  font-weight: 400;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.cal-tray__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cal-tray__items .cal-round {
+  width: auto;
+}
+
+/* Matchday overview (read-only programme) */
+
+.mdov-block {
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+
+.mdov-block:hover {
+  border-color: var(--accent);
+}
+
+.mdov-block__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.mdov-block__spacer {
+  flex: 1;
+}
+
+.mdov-block__fixtures {
+  display: flex;
+  flex-direction: column;
+}
+
+.mdov-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mdov-row:last-child {
+  border-bottom: none;
+}
+
+.mdov-row--bye {
+  opacity: 0.6;
+}
+
+.mdov-row__team {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdov-row__score {
+  flex: none;
+  min-width: 46px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.mdov-row__suffix {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 400;
+}
