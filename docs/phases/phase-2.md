@@ -1,6 +1,6 @@
 # Phase 2 Design Proposal — The Spine, Manual-First
 
-> **Status:** proposal — question round pending.
+> **Status:** ratified 2026-06-10 — question round complete (see §9); implementation in progress.
 
 Companion to `CRUFY_PLAN_2.md` (canonical). Per the plan workflow, this restates the Phase 2 goal and gate, lists every concrete decision I intend to make, flags every override/extension of the plan, and ends with the question round.
 
@@ -42,10 +42,9 @@ export interface Entry {
 
 // competition.ts
 export interface Competition {
-  id: string; name: string; shortName: string;
-  scheduling: 'free-running' | 'calendar-bound';   // wizard offers free-running only in P2
+  id: string; name: string; shortName: string;     // free-running by nature (Q2): the
   sportEvents: SportEvent[];               // named to avoid DOM `Event` collision
-}
+}                                          // schedule is the stages/rounds themselves
 
 // event.ts
 export type SportId = 'football';          // union grows in Phase 8
@@ -75,8 +74,9 @@ export type PairingPattern = 'standard-cross' | 'ranked' | 'manual';
   // manual: host drags entries into bracket slots (always available as override)
 
 export interface TiebreakerConfig {
-  order: ('gd' | 'gf' | 'h2h-points' | 'h2h-gd' | 'h2h-gf')[]; // after points, always
-}
+  order: ('gd' | 'gf' | 'h2h')[];          // after points, always. 'h2h' = composite
+}                                          // mini-table (points → GD). Default ['gd','h2h'];
+                                           // 'gf' is opt-in only (Q3 — NS convention)
 
 export interface Stage {
   id: string; name: string;
@@ -195,15 +195,24 @@ Standings/brackets/qualification are **never persisted** — they are memoized s
 5. **Shootout goals excluded from GF/GA** (decide outcome only).
 6. **Next-stage auto-fill waits for stage completion**, with a God-mode "seed now" override.
 7. **`manualTieOrder`** is the lots-drawing mechanism: hosts order tied sets by hand; no RNG in Phase 2.
-8. **Wizard offers `free-running` only**; the `scheduling` field exists with both values for Phase 5 (→ Q2).
+8. ~~Wizard offers `free-running` only~~ — superseded by Q2: the `scheduling` field is gone; all competitions are free-running by nature.
 9. **Layout**: spine types under `src/domain/spine/`, engines under new `src/engine/` (first non-domain/non-UI source folder).
 10. `SportId` union starts at `'football'` even though all four payload families are typed (plan §1.4 taxonomy honored at the result level, not the module level).
 
 ---
 
-## 8. Question round
+## ~~8. Question round~~ — answered, see §9
 
 - **Q1 — Ratify the plan-2 §10 reordering and this Phase 2 scope** (spine manual-first now; engine P3; publish pipeline P4; generation deferred to P6; transfers optional P9).
 - **Q2 — Scheduling**: ship both `scheduling` values but wire only free-running in Phase 2 (calendar-bound lands with Phase 5)?
 - **Q3 — House default tiebreaker order** (always configurable per stage): overall GD-first (FIFA) vs head-to-head-first (UEFA)?
 - **Q4 — Group assignment**: manual only, or also a seeded-pot random draw in Phase 2?
+
+---
+
+## 9. Resolved decisions (question round outcome, 2026-06-10)
+
+- **Q1 — Ratified.** Phase ordering and this scope proceed as proposed.
+- **Q2 — The `scheduling` concept is dropped entirely.** User: real-world-date mapping isn't wanted; *"Each tournament will need a schedule, however, it is up to the user to progress through that schedule at their own pace."* Every competition is free-running by nature — its schedule is its own stages/rounds, advanced manually. The `Competition.scheduling` field is removed from §2. Whether the savefile-level season calendar still has a job (seasons, promotion/relegation cadence) is now an explicit **Phase 5 question-round item**; the Calendar route/domain stay untouched until then.
+- **Q3 — Default tiebreakers: points → goal difference → head-to-head. Goals-for is explicitly NOT used in NS RP competitions** and must never sneak into a default. Implementation: `TiebreakerConfig.order` becomes `('gd' | 'gf' | 'h2h')[]` where `'h2h'` is a composite mini-table among the tied entries (points, then GD within the mini-table — no GF inside it either). House default `['gd', 'h2h']`; `'gf'` exists only as an explicit opt-in. After the list is exhausted: `manualTieOrder`, then `unresolved` flag.
+- **Q4 — Manual + potted draw, both in Phase 2.** Rank entries into pots, "Draw" performs a seeded random draw, re-rollable until accepted; hand placement always available.

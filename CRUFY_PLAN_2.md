@@ -200,7 +200,7 @@ interface OutcomeRow {
 ```
 
 Standings engines (all pure functions over projections, all heavily tested):
-- **Table** — configurable points (3/1/0 default), tiebreakers as an ordered rule list (GD, GF, head-to-head, …).
+- **Table** — configurable points (3/1/0 default), tiebreakers as an ordered rule list. House default (ratified): **points → GD → head-to-head (composite mini-table: points, then GD)**. Goals-for is *explicitly not used* in NS RP competitions and never appears in a default — it exists only as a per-stage opt-in.
 - **Bracket** — tie resolution incl. two-leg aggregate/away-goals-toggle/shootouts; auto-fills from qualification.
 - **Ranking** — placement by best/aggregate mark, for heats and judged stages (Phase 8).
 - **Medal table** — per-competition rollup of event podiums (Phase 8, Games shells).
@@ -213,13 +213,11 @@ Standings are recomputed from results on every change and cached, never hand-edi
 - **Data-layer guard:** mutation helpers refuse to modify a published result's payload/provenance. The UI's unlock action is the only door, and it appends to `unlocks`.
 - **Integrity warnings** go to the existing Issues system (Phase 1 shipped it), e.g.: a draft edit changed standings that a *published* later round was built on; a bracket slot's published tie contradicts re-derived qualification; Bonus changed after a round that consumed it was published. Warnings never block (God mode) — they inform.
 
-### 4.8 Scheduling: calendar-bound and free-running
+### 4.8 Scheduling: every competition is free-running *(ratified in Phase 2's question round)*
 
-Plan 1 assumed every competition lives on the season calendar. Scorinator reality adds standalone tournaments run on their own cadence. Competitions therefore declare `scheduling`:
-- **`calendar-bound`** — rounds placed onto season matchday slots (domestic leagues/cups; plan 1's model, Phase 5).
-- **`free-running`** — rounds advanced manually in order, no calendar involvement (a World Cup hosted whenever rounds are ready; Phase 2's default).
+There is no mapping of rounds onto external calendar slots and no real-world-date concept. A competition's schedule **is** its stages and rounds; the host advances through it at their own pace. (User, 2026-06-10: *"Each tournament will need a schedule, however, it is up to the user to progress through that schedule at their own pace."*)
 
-*(New, not yet user-ratified — confirm in Phase 2's question round.)*
+What remains of plan 1's season calendar (seasons as labels, promotion/relegation cadence, the Calendar route) is an explicit **Phase 5 question-round item** — until then the calendar domain/route stay untouched.
 
 ---
 
@@ -326,7 +324,7 @@ Sidebar unchanged from Phase 1 (Overview / World / Country / Records / Beyond / 
 Phases 0–1 shipped under plan 1 (§11). Numbering continues; contents reordered around the scorinator core. **This reordering is a planning-agent proposal — ratify in Phase 2's question round** (§12).
 
 ### Phase 2 — The spine, manual-first
-Domain: Competition/SportEvent/Stage/Round/Entry/ResultEnvelope with all four payload families typed; projections; table + bracket engines with declarative qualification; lifecycle with data-layer publish guard + logged unlocks; integrity warnings in Issues; ad-hoc participants; free-running scheduling; Competitions UI with fast manual entry; BBCode table/results export (minimal, ahead of Phase 4 polish). Replaces `domain/competition.ts` scaffolding. **No engine yet — manual results prove the spine.**
+Domain: Competition/SportEvent/Stage/Round/Entry/ResultEnvelope with all four payload families typed; projections; table + bracket engines with declarative qualification; lifecycle with data-layer publish guard + logged unlocks; integrity warnings in Issues; ad-hoc participants; manual + potted-draw group assignment; Competitions UI with fast manual entry; BBCode table/results export (minimal, ahead of Phase 4 polish). Replaces `domain/competition.ts` scaffolding. **No engine yet — manual results prove the spine.** Design proposal: [`docs/phases/phase-2.md`](docs/phases/phase-2.md) (ratified 2026-06-10).
 **Gate:** host builds a 32-entry World Cup (ad-hoc names + ranks only): groups → knockout, hand-typed results, standings/brackets always correct and auto-reflowing, rounds published (edits refused without unlock; unlock logged; integrity warning fires on upstream edits), group tables exported as BBCode. A classic double-RR league works the same way.
 
 ### Phase 3 — The football engine
@@ -337,9 +335,9 @@ Domain: Competition/SportEvent/Stage/Round/Entry/ResultEnvelope with all four pa
 §8 in full: round posts, prose match reports (3 templates), copy-all, publish-and-copy gesture, post-URL tracking.
 **Gate:** a full tournament thread's worth of posts produced from CRUFY and pasted onto NS with no manual cleanup.
 
-### Phase 5 — Calendar & domestic seasons
-Calendar-bound competitions: round placement on season slots (auto-spread + manual), multi-competition stacking, season advance simming due rounds, promotion/relegation, end-of-season archive & rollover, player season stats accumulation (when squads exist).
-**Gate:** a domestic league + cup season runs end-to-end on the calendar; tables, top scorers, archive correct.
+### Phase 5 — Seasons & the calendar question
+Seasons as a concept (labels/cadence), promotion/relegation between linked competitions, end-of-season archive & rollover, player season stats accumulation (when squads exist). **Opens with a question round on what remains of plan 1's season calendar** — competitions are free-running by ratified decision (§4.8), so the Calendar route either becomes a cross-competition overview/dashboard or is retired.
+**Gate:** a domestic league + cup run across two seasons with promotion/relegation and a correct archive.
 
 ### Phase 6 — Procedural generation (plan 1's Phase 2, deferred until depth is needed)
 Player/squad/manager/league generators, name pools, stat fuzzification, bulk-create.
@@ -381,12 +379,12 @@ Policy: in-development schema changes mutate the v1 baseline; no per-change migr
 
 ## 12. Open questions ledger
 
-For the next (Phase 2) question round:
-- **Ratify the §10 reordering** — especially manual-first-before-engine, publishing at Phase 4, generation pushed to Phase 6, transfers demoted to optional.
-- `free-running` vs `calendar-bound` competitions (§4.8) — confirm the split and the Phase 2 default.
-- Event layer inside Competition (§4.1) — confirm, including UI collapsing for single-event competitions.
-- Publish granularity: per-result status with round-level "publish all" (proposed) — confirm.
-- Stage format parameter sets for Phase 2 (group sizes, two-leg rules, tiebreaker list defaults).
+~~For the next (Phase 2) question round~~ — **resolved 2026-06-10**, outcomes in [`docs/phases/phase-2.md`](docs/phases/phase-2.md) §9:
+- §10 reordering **ratified**; Phase 2 scope ratified as proposed.
+- Scheduling: the calendar-bound/free-running split is **gone** — every competition is free-running (§4.8); season-calendar's fate moved to Phase 5's round.
+- Tiebreaker house default: **points → GD → H2H; goals-for never in defaults** (NS convention).
+- Group assignment: **manual + potted draw**, both in Phase 2.
+- Event layer + per-result publish with round-level "publish all": proceeding as proposed (covered by the scope ratification).
 
 For Phase 3's round:
 - Bonus aggregation (sum/mean/latest; decay; per-round vs cumulative) and whether aggregation itself is a per-save setting (§5.2).
