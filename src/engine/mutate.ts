@@ -106,7 +106,24 @@ function guardDraft(fx: Fixture): void {
 // Competitions
 
 export function addCompetition(sf: Savefile, spec: CompetitionSpec): { savefile: Savefile; competition: Competition } {
-  const competition = createCompetitionFromSpec(spec);
+  const generated = createCompetitionFromSpec(spec);
+  // Place rounds on the global calendar: consecutive matchdays from the current
+  // one; anything past the season's end stays unscheduled (null).
+  let md = sf.calendar.currentMatchday;
+  const competition: Competition = {
+    ...generated,
+    sportEvents: generated.sportEvents.map((ev) => ({
+      ...ev,
+      stages: ev.stages.map((stage) => ({
+        ...stage,
+        rounds: stage.rounds.map((round) => {
+          const assigned = md <= sf.calendar.matchdaysPerSeason ? md : null;
+          md += 1;
+          return { ...round, calendarMatchday: assigned };
+        }),
+      })),
+    })),
+  };
   const withComp: Savefile = { ...sf, competitions: [...sf.competitions, competition] };
   const event = competition.sportEvents[0];
   const reflowed = event ? reflow(withComp, { competitionId: competition.id, eventId: event.id }) : withComp;
@@ -311,6 +328,18 @@ export function setStageRules(sf: Savefile, ref: StageRef, input: StageRulesInpu
     };
   });
   return reflow(next, ref);
+}
+
+export function setRoundMatchday(sf: Savefile, ref: RoundRef, matchday: number | null): Savefile {
+  if (matchday !== null && (matchday < 1 || matchday > sf.calendar.matchdaysPerSeason)) {
+    throw new SpineGuardError(`matchday must be 1–${sf.calendar.matchdaysPerSeason} (or unscheduled)`);
+  }
+  return mapStage(sf, ref, (stage) => ({
+    ...stage,
+    rounds: stage.rounds.map(
+      (round): Round => (round.id === ref.roundId ? { ...round, calendarMatchday: matchday } : round),
+    ),
+  }));
 }
 
 export function renameRound(sf: Savefile, ref: RoundRef, name: string): Savefile {

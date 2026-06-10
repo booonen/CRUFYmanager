@@ -15,7 +15,6 @@ describe('jsonIO', () => {
     expect(parsed.meta.countryName).toBe('Testland');
     expect(parsed.meta.countryShortCode).toBe('TST');
     expect(parsed.calendar.matchdaysPerSeason).toBe(38);
-    expect(parsed.calendar.schedule).toHaveLength(38);
   });
 
   it('rejects non-JSON', () => {

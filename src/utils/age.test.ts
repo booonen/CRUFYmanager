@@ -6,7 +6,6 @@ const cal = (season: number, matchday: number): Calendar => ({
   currentSeason: season,
   currentMatchday: matchday,
   matchdaysPerSeason: 52,
-  schedule: [],
 });
 
 describe('age', () => {

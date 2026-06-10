@@ -1137,3 +1137,64 @@
   color: var(--text-muted);
   margin: 8px 0 2px;
 }
+
+/* Cross-competition calendar grid */
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 6px;
+}
+
+.cal-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 52px;
+  padding: 6px 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.cal-cell:hover {
+  background: var(--bg-hover);
+}
+
+.cal-cell--selected {
+  background: var(--bg-hover);
+  border-color: var(--text-dim);
+}
+
+.cal-cell--current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-glow);
+}
+
+.cal-cell__md {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.cal-cell--busy .cal-cell__md {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.cal-cell__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.cal-cell__chip {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--accent-glow);
+  color: var(--accent);
+}

@@ -81,6 +81,7 @@ const mkRound = (index: number, name: string, fixtures: Fixture[]): Round => ({
   id: newId(),
   index,
   name,
+  calendarMatchday: null, // assigned from the global calendar in addCompetition
   fixtures,
 });
 

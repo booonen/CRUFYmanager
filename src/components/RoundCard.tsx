@@ -9,6 +9,7 @@ import {
   clearFixtureResult,
   enterScore,
   publishRoundAction,
+  setRoundMatchdayAction,
   unlockResultAction,
   type SpineActionResult,
 } from '../stores/competitions';
@@ -16,6 +17,7 @@ import { copyText } from '../utils/clipboard';
 import { entryDisplay } from '../utils/participants';
 import { AssignSlotModal } from './AssignSlotModal';
 import { Button } from './Button';
+import { NumberInput } from './NumberInput';
 import { UnlockResultModal } from './UnlockResultModal';
 
 interface RoundCardProps {
@@ -180,7 +182,25 @@ export function RoundCard({ sf, event, stage, round, stageRef }: RoundCardProps)
   return (
     <div className="panel round-card">
       <div className="round-card__head">
-        <div style={{ fontWeight: 600 }}>{round.name}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontWeight: 600 }}>{round.name}</div>
+          <span
+            className="mono"
+            style={{ fontSize: 10, color: 'var(--text-muted)' }}
+            title={t('calendar.mdHint')}
+          >
+            {t('calendar.mdBadge')}
+          </span>
+          <NumberInput
+            className="input"
+            style={{ width: 52, padding: '2px 4px', fontSize: 11 }}
+            value={round.calendarMatchday ?? 0}
+            min={0}
+            max={sf.calendar.matchdaysPerSeason}
+            title={t('calendar.mdHint')}
+            onCommit={(v) => run(setRoundMatchdayAction({ ...stageRef, roundId: round.id }, v === 0 ? null : v))}
+          />
+        </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {allPublished ? (
             <span className="chip chip--active" style={{ fontSize: 11 }}>

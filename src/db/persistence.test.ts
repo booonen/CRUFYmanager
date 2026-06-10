@@ -22,7 +22,6 @@ describe('persistence', () => {
     expect(loaded?.savefile.meta.countryName).toBe('Testland');
     expect(loaded?.savefile.meta.countryShortCode).toBe('TST');
     expect(loaded?.savefile.calendar.matchdaysPerSeason).toBe(32);
-    expect(loaded?.savefile.calendar.schedule).toHaveLength(32);
   });
 
   it('lists save slots ordered by lastSavedAt desc', async () => {

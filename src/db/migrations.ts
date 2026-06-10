@@ -10,42 +10,61 @@ export type Migration = (savefile: Savefile) => Savefile;
 const migrations: Record<number, Migration> = {};
 
 /**
- * In-development baseline normalizer. Entry.seeding changed from
- * `{ mode: 'rank' | 'rating'; value }` to a plain higher-is-better decimal.
- * Old rank-mode values (1 = best) are inverted within their event so existing
- * dev saves keep a sensible order.
+ * In-development baseline normalizers (saves are disposable, but cheap fixes
+ * keep dev worlds alive):
+ * - Entry.seeding changed from `{ mode: 'rank' | 'rating'; value }` to a plain
+ *   higher-is-better decimal; old rank-mode values (1 = best) are inverted
+ *   within their event.
+ * - Round.calendarMatchday added; rounds without it get consecutive matchdays
+ *   from 1 per competition.
  */
-function normalizeSeeding(savefile: Savefile): Savefile {
+function normalizeBaseline(savefile: Savefile): Savefile {
   let touched = false;
-  const competitions = savefile.competitions.map((comp) => ({
-    ...comp,
-    sportEvents: comp.sportEvents.map((event) => {
-      const legacy = event.entries.filter(
-        (e) => typeof (e.seeding as unknown) === 'object' && e.seeding !== null,
-      );
-      if (legacy.length === 0) return event;
-      touched = true;
-      const oldOf = (e: (typeof event.entries)[number]) =>
-        e.seeding as unknown as { mode: 'rank' | 'rating'; value: number };
-      const maxRank = Math.max(
-        0,
-        ...legacy.filter((e) => oldOf(e).mode === 'rank').map((e) => oldOf(e).value),
-      );
-      return {
-        ...event,
-        entries: event.entries.map((e) => {
-          if (typeof (e.seeding as unknown) !== 'object' || e.seeding === null) return e;
-          const old = oldOf(e);
-          return { ...e, seeding: old.mode === 'rank' ? maxRank + 1 - old.value : old.value };
-        }),
-      };
-    }),
-  }));
+  const competitions = savefile.competitions.map((comp) => {
+    let md = 1;
+    return {
+      ...comp,
+      sportEvents: comp.sportEvents.map((event) => {
+        const legacy = event.entries.filter(
+          (e) => typeof (e.seeding as unknown) === 'object' && e.seeding !== null,
+        );
+        const oldOf = (e: (typeof event.entries)[number]) =>
+          e.seeding as unknown as { mode: 'rank' | 'rating'; value: number };
+        const maxRank = Math.max(
+          0,
+          ...legacy.filter((e) => oldOf(e).mode === 'rank').map((e) => oldOf(e).value),
+        );
+        const entries =
+          legacy.length === 0
+            ? event.entries
+            : event.entries.map((e) => {
+                if (typeof (e.seeding as unknown) !== 'object' || e.seeding === null) return e;
+                const old = oldOf(e);
+                return { ...e, seeding: old.mode === 'rank' ? maxRank + 1 - old.value : old.value };
+              });
+        if (legacy.length > 0) touched = true;
+
+        const stages = event.stages.map((stage) => ({
+          ...stage,
+          rounds: stage.rounds.map((round) => {
+            const has = (round as { calendarMatchday?: number | null }).calendarMatchday !== undefined;
+            const assigned = md <= savefile.calendar.matchdaysPerSeason ? md : null;
+            md += 1;
+            if (has) return round;
+            touched = true;
+            return { ...round, calendarMatchday: assigned };
+          }),
+        }));
+
+        return { ...event, entries, stages };
+      }),
+    };
+  });
   return touched ? { ...savefile, competitions } : savefile;
 }
 
 export function migrate(savefile: Savefile): Savefile {
-  let current = normalizeSeeding(savefile);
+  let current = normalizeBaseline(savefile);
   let from = current.meta.schemaVersion;
 
   while (from < SCHEMA_VERSION) {

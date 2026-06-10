@@ -17,10 +17,6 @@ const emptyCalendar = (matchdaysPerSeason: number): Calendar => ({
   currentSeason: 1,
   currentMatchday: 1,
   matchdaysPerSeason,
-  schedule: Array.from({ length: matchdaysPerSeason }, (_, i) => ({
-    matchday: i + 1,
-    fixtures: [],
-  })),
 });
 
 const emptyNationalTeam = (): NationalTeam => ({

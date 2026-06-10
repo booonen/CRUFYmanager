@@ -19,5 +19,11 @@ export interface Round {
   index: number;
   /** Auto-named at generation ("Matchday 4", "Semifinals · Leg 2"); renamable. */
   name: string;
+  /**
+   * Global calendar matchday this round sits on (the cross-competition
+   * calendar lens). Null = unscheduled. Auto-assigned sequentially from the
+   * current matchday at creation; freely reassignable.
+   */
+  calendarMatchday: number | null;
   fixtures: Fixture[];
 }

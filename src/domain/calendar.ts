@@ -1,22 +1,13 @@
+/**
+ * The global abstract-matchday timeline (no real-world dates). Competition
+ * rounds carry a `calendarMatchday` pointing into this sequence; the Calendar
+ * view is the cross-competition lens over it. The host advances at their own
+ * pace.
+ */
 export interface Calendar {
   currentSeason: number;
   currentMatchday: number;
   matchdaysPerSeason: number;
-  schedule: ScheduleSlot[];
-}
-
-export interface ScheduleSlot {
-  matchday: number;
-  fixtures: ScheduledFixture[];
-}
-
-export type FixtureKind = 'competition' | 'national' | 'other';
-
-export interface ScheduledFixture {
-  fixtureId: string;
-  kind: FixtureKind;
-  competitionId: string | null;
-  competitionMatchday: number | null;
 }
 
 export interface CalendarDate {

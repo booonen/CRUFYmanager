@@ -26,10 +26,12 @@ export function DashboardRoute() {
   }
 
   const realClubs = savefile.clubs.filter(isRealClub);
-  const fixtureCount = savefile.calendar.schedule.reduce(
-    (sum, slot) => sum + slot.fixtures.length,
-    0,
-  );
+  const scheduledRounds = savefile.competitions
+    .flatMap((comp) => comp.sportEvents)
+    .flatMap((event) => event.stages)
+    .flatMap((stage) => stage.rounds)
+    .filter((round) => round.calendarMatchday !== null);
+  const fixtureCount = scheduledRounds.reduce((sum, round) => sum + round.fixtures.length, 0);
   const domesticPlayerCount = savefile.players.filter((p) => p.tier === 'domestic').length;
 
   const stats: { label: string; value: string | number }[] = [

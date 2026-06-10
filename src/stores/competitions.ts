@@ -13,6 +13,7 @@ import {
   publishRound,
   renameRound,
   setManualTieOrder,
+  setRoundMatchday,
   setScore,
   setStageRules,
   unlockResult,
@@ -104,6 +105,10 @@ export function updateStageRules(ref: StageRef, input: StageRulesInput): SpineAc
 
 export function renameRoundAction(ref: RoundRef, name: string): SpineActionResult {
   return mutateSpine((sf) => renameRound(sf, ref, name));
+}
+
+export function setRoundMatchdayAction(ref: RoundRef, matchday: number | null): SpineActionResult {
+  return mutateSpine((sf) => setRoundMatchday(sf, ref, matchday));
 }
 
 export function forceSeed(ref: EventRef, targetStageIndex: number): SpineActionResult {
