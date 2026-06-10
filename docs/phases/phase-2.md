@@ -1,6 +1,6 @@
 # Phase 2 Design Proposal — The Spine, Manual-First
 
-> **Status:** ratified 2026-06-10 — question round complete (see §9); implementation in progress.
+> **Status:** implemented 2026-06-10 (commit `2e89e8b`) — question round in §9, implementation notes in §10. **Acceptance gate verification on the deployed site is still owed** (the §6 checklist); an automated rehearsal of the same journey runs in CI (`src/engine/gate.test.ts`).
 
 Companion to `CRUFY_PLAN_2.md` (canonical). Per the plan workflow, this restates the Phase 2 goal and gate, lists every concrete decision I intend to make, flags every override/extension of the plan, and ends with the question round.
 
@@ -216,3 +216,19 @@ Standings/brackets/qualification are **never persisted** — they are memoized s
 - **Q2 — The `scheduling` concept is dropped entirely.** User: real-world-date mapping isn't wanted; *"Each tournament will need a schedule, however, it is up to the user to progress through that schedule at their own pace."* Every competition is free-running by nature — its schedule is its own stages/rounds, advanced manually. The `Competition.scheduling` field is removed from §2. Whether the savefile-level season calendar still has a job (seasons, promotion/relegation cadence) is now an explicit **Phase 5 question-round item**; the Calendar route/domain stay untouched until then.
 - **Q3 — Default tiebreakers: points → goal difference → head-to-head. Goals-for is explicitly NOT used in NS RP competitions** and must never sneak into a default. Implementation: `TiebreakerConfig.order` becomes `('gd' | 'gf' | 'h2h')[]` where `'h2h'` is a composite mini-table among the tied entries (points, then GD within the mini-table — no GF inside it either). House default `['gd', 'h2h']`; `'gf'` exists only as an explicit opt-in. After the list is exhausted: `manualTieOrder`, then `unresolved` flag.
 - **Q4 — Manual + potted draw, both in Phase 2.** Rank entries into pots, "Draw" performs a seeded random draw, re-rollable until accepted; hand placement always available.
+
+---
+
+## 10. Implementation notes (deviations & decisions made while building)
+
+1. **`Stage.bracket` is explicit wiring**: `BracketTie { phase, slot, home/away: TieFeed }` where feeds (`entry`, `winner-of`, `loser-of`, `group-qualifier`, `seed`, `bye`, `tbd`) are **never rewritten by qualification** — resolution is recomputed on every reflow and written onto result-less fixtures only. Manual slot assignment is the one thing that rewrites a feed (to `entry`/`tbd`), making host overrides permanent. Unresolved feeds never blank a previously filled slot; staleness is integrity's job.
+2. **`Fixture.isBye`** + knockout sizes need not be powers of two: brackets pad to the next power, top seeds rest, byes auto-advance without results.
+3. **Third place is its own round** before the final (both always single-leg).
+4. **`awayGoals` lives on the knockout `StageFormat`** and is editable post-creation via stage rules (reflows tie resolution).
+5. **Tiebreaker UI is three presets** (GD→H2H default · H2H→GD · GD→GF→H2H); the engine accepts arbitrary `('gd'|'gf'|'h2h')[]` orders for later UI.
+6. **Per-result publish exists at the API level only**; the UI ships round-level publish + per-fixture unlock, as proposed.
+7. **Entries are fixed once generated** in Phase 2: the wizard is the only place to add them; the Entries tab edits seeding only. (`removeEntry` exists but guards against any scheduled reference, which post-generation is always.) Late additions/withdrawals are a future-phase question.
+8. **Monotonic mutation clock**: `modifiedAt`/`publishedAt` are guaranteed strictly increasing within a session so integrity's `>` comparisons are deterministic.
+9. **Seeding-mode mixing quirk**: `orderEntriesBySeeding` sorts all `rating` entries above all `rank` entries. Wizard paste lines are rank-mode, world picks rating-mode — harmonize in the Entries tab if you mix them. Candidate for a Phase 3 cleanup alongside the rank→rating curve.
+10. **Stale-upstream also fires when upstream results are *entered* after a downstream round was published** (not just edited) — the published cumulative table was incomplete, so the warning is honest. Warnings inform, never block.
+11. `src/engine/testkit.ts` provides save/spec/fill helpers for engine tests; `gate.test.ts` automates §6's journey (32-nation WC end-to-end incl. publishing, BBCode shape checks; 12-team double RR).
