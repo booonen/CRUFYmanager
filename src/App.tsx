@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { CalendarRoute } from './routes/Calendar';
 import { ClubDetailRoute } from './routes/ClubDetail';
 import { ClubsRoute } from './routes/Clubs';
+import { CompetitionDetailRoute } from './routes/CompetitionDetail';
 import { CompetitionsRoute } from './routes/Competitions';
 import { DashboardRoute } from './routes/Dashboard';
 import { HistoryRoute } from './routes/History';
@@ -35,6 +36,7 @@ export function App() {
         <Route path="/issues" element={<IssuesRoute />} />
         <Route path="/calendar" element={<CalendarRoute />} />
         <Route path="/competitions" element={<CompetitionsRoute />} />
+        <Route path="/competitions/:id" element={<CompetitionDetailRoute />} />
         <Route path="/clubs" element={<ClubsRoute />} />
         <Route path="/clubs/:id" element={<ClubDetailRoute />} />
         <Route path="/players" element={<PlayersRoute />} />

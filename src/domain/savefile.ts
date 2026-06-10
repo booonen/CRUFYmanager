@@ -1,6 +1,6 @@
 import type { Calendar } from './calendar';
 import type { Club } from './club';
-import type { Competition } from './competition';
+import type { Competition } from './spine';
 import type { ForeignWorld } from './foreignWorld';
 import type { HistoryArchive } from './history';
 import type { Manager } from './manager';

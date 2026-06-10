@@ -1,6 +1,6 @@
 export * from './calendar';
 export * from './club';
-export * from './competition';
+export * from './spine';
 export * from './foreignWorld';
 export * from './history';
 export * from './manager';

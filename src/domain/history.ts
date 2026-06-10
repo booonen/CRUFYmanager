@@ -1,4 +1,4 @@
-import type { Competition } from './competition';
+import type { Competition } from './spine';
 
 export interface SeasonRecord {
   season: number;

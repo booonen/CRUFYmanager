@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeading } from '../components/PageHeading';
+import { spineWarnings } from '../engine/integrity';
 import { t } from '../lang';
 import { useSavefileStore } from '../stores/savefile';
 import { isRealClub } from '../utils/freeAgents';
@@ -37,7 +38,9 @@ export function computeIssues(
 }
 
 export function useIssueCount(): number {
-  return useSavefileStore((s) => (s.savefile ? computeIssues(s.savefile.clubs).length : 0));
+  return useSavefileStore((s) =>
+    s.savefile ? computeIssues(s.savefile.clubs).length + spineWarnings(s.savefile).length : 0,
+  );
 }
 
 export function IssuesRoute() {
@@ -60,12 +63,49 @@ export function IssuesRoute() {
   }
 
   const issues = computeIssues(savefile.clubs);
+  const warnings = spineWarnings(savefile);
 
   return (
     <>
       <PageHeading title={t('nav.issues')} sub={t('issues.sub')} />
 
-      {issues.length === 0 ? (
+      {warnings.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {warnings.map((w) => (
+            <Link
+              key={w.id}
+              to={`/competitions/${w.competitionId}`}
+              className="list-row"
+              style={{ textDecoration: 'none' }}
+            >
+              <span
+                className="mono"
+                style={{
+                  fontSize: 11,
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  background: 'rgba(224, 85, 85, 0.18)',
+                  color: 'var(--danger)',
+                }}
+              >
+                {w.kind === 'stale-upstream' ? 'STALE' : 'BRACKET'}
+              </span>
+              <div className="list-row__main">
+                <div className="list-row__title" style={{ color: 'var(--text)' }}>
+                  {t(
+                    w.kind === 'stale-upstream'
+                      ? 'issues.kind.staleUpstream'
+                      : 'issues.kind.bracketContradiction',
+                    { comp: w.competitionName, stage: w.stageName, round: w.roundName },
+                  )}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : null}
+
+      {issues.length === 0 && warnings.length === 0 ? (
         <div
           className="panel"
           style={{
@@ -77,7 +117,7 @@ export function IssuesRoute() {
         >
           {t('issues.none')}
         </div>
-      ) : (
+      ) : issues.length === 0 ? null : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {issues.map((iss) => (
             <Link
