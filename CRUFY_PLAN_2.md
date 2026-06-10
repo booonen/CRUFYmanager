@@ -213,11 +213,15 @@ Standings are recomputed from results on every change and cached, never hand-edi
 - **Data-layer guard:** mutation helpers refuse to modify a published result's payload/provenance. The UI's unlock action is the only door, and it appends to `unlocks`.
 - **Integrity warnings** go to the existing Issues system (Phase 1 shipped it), e.g.: a draft edit changed standings that a *published* later round was built on; a bracket slot's published tie contradicts re-derived qualification; Bonus changed after a round that consumed it was published. Warnings never block (God mode) — they inform.
 
-### 4.8 Scheduling: every competition is free-running *(ratified in Phase 2's question round)*
+### 4.8 Scheduling: the two-lens calendar *(ratified in Phase 2's question round; refined in the polish round)*
 
-There is no mapping of rounds onto external calendar slots and no real-world-date concept. A competition's schedule **is** its stages and rounds; the host advances through it at their own pace. (User, 2026-06-10: *"Each tournament will need a schedule, however, it is up to the user to progress through that schedule at their own pace."*)
+No real-world dates exist anywhere. There is a **global timeline of abstract matchdays** (the savefile calendar: season, current matchday, matchdays per season), and every competition round carries a nullable `calendarMatchday` pointing into it — auto-assigned consecutively from the current matchday at creation, freely reassignable, stackable (many competitions on one day).
 
-What remains of plan 1's season calendar (seasons as labels, promotion/relegation cadence, the Calendar route) is an explicit **Phase 5 question-round item** — until then the calendar domain/route stay untouched.
+Two lenses over the same data, both first-class (user, polish round: *"from the calendar I should be able to see which competitions are played on a given matchday, then ... see the information about each competition's matchday! It's not a calendar per competition"*):
+- **Per-competition**: the cockpit's matchday rail — step through one competition's schedule round by round.
+- **Cross-competition**: the Calendar route — a grid of global matchdays showing which competitions play on each; selecting a day surfaces every competition's round on it for inspection and result entry in place.
+
+The host advances the current matchday manually, at their own pace (*"it is up to the user to progress through that schedule at their own pace"*). What remains for **Phase 5**: seasons as a rollover concept (archives, promotion/relegation cadence, new-season reset of the matchday counter).
 
 ---
 
@@ -335,8 +339,8 @@ Domain: Competition/SportEvent/Stage/Round/Entry/ResultEnvelope with all four pa
 §8 in full: round posts, prose match reports (3 templates), copy-all, publish-and-copy gesture, post-URL tracking.
 **Gate:** a full tournament thread's worth of posts produced from CRUFY and pasted onto NS with no manual cleanup.
 
-### Phase 5 — Seasons & the calendar question
-Seasons as a concept (labels/cadence), promotion/relegation between linked competitions, end-of-season archive & rollover, player season stats accumulation (when squads exist). **Opens with a question round on what remains of plan 1's season calendar** — competitions are free-running by ratified decision (§4.8), so the Calendar route either becomes a cross-competition overview/dashboard or is retired.
+### Phase 5 — Seasons
+The two-lens calendar (§4.8) shipped in Phase 2's polish round; what remains here is the *season* concept: end-of-season archive & rollover (matchday counter reset, season increment), promotion/relegation between linked competitions, player season stats accumulation (when squads exist), and re-hosting a competition's next edition from its previous one.
 **Gate:** a domestic league + cup run across two seasons with promotion/relegation and a correct archive.
 
 ### Phase 6 — Procedural generation (plan 1's Phase 2, deferred until depth is needed)
@@ -372,7 +376,13 @@ Policy: in-development schema changes mutate the v1 baseline; no per-change migr
 ### Phase 2 — implemented 2026-06-10, gate verification pending · proposal: [`docs/phases/phase-2.md`](docs/phases/phase-2.md)
 Question round resolved (proposal §9): scope & §10 reordering ratified; **scheduling concept dropped** — every competition is free-running, the season calendar's fate moved to Phase 5's round; **tiebreaker default points → GD → H2H, GF never in defaults** (NS convention; `'h2h'` = composite mini-table points→GD); **manual + potted draw** both shipped.
 Implementation landed on `claude/affectionate-heisenberg-9bln2f` (commit `2e89e8b`): spine domain (`src/domain/spine/`), pure engines (`src/engine/` — projections, RR scheduler, tables, brackets with stable feeds, declarative qualification, publish guard, integrity warnings, generator + potted draw), cockpit UI (wizard with bulk paste, stage tabs, live standings, bracket view, fast score entry, AET/pens, publish/unlock, group draw, stage rules, manual lots, BBCode copy), Issues integration. 41 engine tests incl. an automated gate rehearsal; 72 total green. Implementation-level deviations logged in proposal §10 (notably: explicit `Stage.bracket` wiring with never-rewritten feeds; byes for non-power-of-two knockouts; entries fixed once generated in this phase).
-**Outstanding before the phase closes:** the §6 manual gate checklist on the deployed Pages site, then merge + this log's final entry.
+**Polish round (2026-06-10, after first hands-on):** user feedback drove four changes, all shipped same day:
+- **Seeding is a plain decimal rating** — higher = better, scale-free (football ranks ~0–30 with two decimals, Olympic events 0–100; same internal-consistency principle as the Bonus). The ordinal rank/rating mode split was wrong and is gone; old dev saves normalize on load. Phase 3 note: the engine must work off rating *gaps* in a scale-aware way (per-save spread parameter).
+- **The cockpit is matchday-centric** — a round rail with status glyphs (○ ◐ ● ✓) focuses one matchday at a time; group-stage matchdays section fixtures per group; the standings panel shows the cumulative table *as of the focused matchday*.
+- **BBCode matches real NS results posts** — per-group `[box]`, bold `MD{n}` header, plain result lines, then the cumulative `[pre]` monospace table (GF/GA columns, `=` on rows tied on pts+GD, U+2212 minus). "Copy matchday post" is the flagship export; the sample post that defines the format is the Phase 4 baseline.
+- **The two-lens calendar (§4.8)** — user clarified the cross-competition grid is core, not per-competition only. `Round.calendarMatchday` + the Calendar route (grid of global matchdays → select a day → every competition's round on it, editable in place; double-click sets current; Advance steps it). Plan-1 `ScheduleSlot`/`ScheduledFixture` scaffolding deleted.
+
+**Outstanding before the phase closes:** re-verify the §6 gate checklist (now including the calendar flow) on the deployed Pages site, then merge + this log's final entry.
 
 ### Replan — 2026-06-10 (this document)
 - User brief reframed CRUFY around the NS scorinator workflow; question round ratified the four decisions in §1 (lock-on-publish; scale-agnostic additive Bonus; per-savefile randomness with fresh stored seeds; all four sport families eventually, taxonomy baked in now).
