@@ -1,5 +1,9 @@
 # CRUFYmanager — Project Plan
 
+> ## ⛔ SUPERSEDED — see [`CRUFY_PLAN_2.md`](CRUFY_PLAN_2.md)
+>
+> As of 2026-06-10 this document is **no longer the canonical plan**. A second brief reframed CRUFY around the NationStates scorinator workflow (lock-on-publish results, RP Bonus, dictated scorelines, multi-sport spine), and a user-ratified question round settled the new core decisions. [`CRUFY_PLAN_2.md`](CRUFY_PLAN_2.md) is now canonical; it carries the Phase 0–1 outcomes forward. This file is kept for archaeology only — do not execute phases from it.
+
 **Companion to APPYmanager and BRIXYmanager.** Generates fictional football competitions, players, seasons, and match reports for use on the NationStates forum.
 
 ---
