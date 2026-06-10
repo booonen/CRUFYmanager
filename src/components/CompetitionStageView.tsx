@@ -1,8 +1,12 @@
 import { useMemo, useState } from 'react';
 import type { Savefile } from '../domain/savefile';
-import type { Competition, SportEvent, Stage } from '../domain/spine';
+import type { Competition, Round, SportEvent, Stage } from '../domain/spine';
 import type { StageRef } from '../engine/mutate';
-import { computeGroupTables, computeOverallTable, stageComplete } from '../engine/qualification';
+import {
+  computeGroupTablesThrough,
+  computeOverallTableThrough,
+  stageComplete,
+} from '../engine/qualification';
 import { stageTablesBBCode } from '../export/bbcode';
 import { t } from '../lang';
 import { forceSeed, saveManualTieOrder, updateStageRules } from '../stores/competitions';
@@ -39,6 +43,30 @@ function presetOf(stage: Stage): TbPreset {
   return 'default';
 }
 
+type RoundStatus = 'empty' | 'partial' | 'complete' | 'published';
+
+function roundStatus(round: Round): RoundStatus {
+  const playable = round.fixtures.filter((fx) => !fx.isBye);
+  if (playable.length === 0) return 'complete';
+  const withResult = playable.filter((fx) => fx.result !== null);
+  if (withResult.length === 0) return 'empty';
+  if (withResult.length < playable.length) return 'partial';
+  return playable.every((fx) => fx.result?.lifecycle.status === 'published') ? 'published' : 'complete';
+}
+
+const STATUS_GLYPH: Record<RoundStatus, string> = {
+  empty: '○',
+  partial: '◐',
+  complete: '●',
+  published: '✓',
+};
+
+function compactLabel(stage: Stage, round: Round): string {
+  return stage.format.kind === 'league' || stage.format.kind === 'groups'
+    ? `MD${round.index + 1}`
+    : round.name;
+}
+
 export function CompetitionStageView({ sf, competition, event, stage, stageIndex }: CompetitionStageViewProps) {
   const stageRef: StageRef = { competitionId: competition.id, eventId: event.id, stageId: stage.id };
   const [drawOpen, setDrawOpen] = useState(false);
@@ -48,10 +76,25 @@ export function CompetitionStageView({ sf, competition, event, stage, stageIndex
 
   const isKnockout = stage.format.kind === 'knockout';
   const isGroups = stage.format.kind === 'groups';
-  const groupTables = useMemo(() => (isGroups ? computeGroupTables(stage) : null), [isGroups, stage]);
+
+  // Matchday focus: the host steps through the schedule at their own pace.
+  const [focusedRoundId, setFocusedRoundId] = useState<string | null>(null);
+  const focusedRound = useMemo(() => {
+    const byId = stage.rounds.find((r) => r.id === focusedRoundId);
+    if (byId) return byId;
+    return stage.rounds.find((r) => roundStatus(r) === 'empty' || roundStatus(r) === 'partial') ?? stage.rounds.at(-1) ?? null;
+  }, [stage, focusedRoundId]);
+
+  const groupTables = useMemo(
+    () => (isGroups && focusedRound ? computeGroupTablesThrough(stage, focusedRound.index) : null),
+    [isGroups, stage, focusedRound],
+  );
   const overallTable = useMemo(
-    () => (stage.format.kind === 'league' ? computeOverallTable(stage) : null),
-    [stage],
+    () =>
+      stage.format.kind === 'league' && focusedRound
+        ? computeOverallTableThrough(stage, focusedRound.index)
+        : null,
+    [stage, focusedRound],
   );
 
   const qualifyCount = stage.qualification.find((q) => q.kind === 'top-n-per-group')?.n ?? 0;
@@ -78,7 +121,27 @@ export function CompetitionStageView({ sf, competition, event, stage, stageIndex
   };
 
   return (
-    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+    <>
+      <div className="round-rail">
+        {stage.rounds.map((round) => {
+          const status = roundStatus(round);
+          const active = focusedRound?.id === round.id;
+          return (
+            <button
+              key={round.id}
+              type="button"
+              className={`chip round-rail__chip ${active ? 'chip--active' : ''}`}
+              title={round.name}
+              onClick={() => setFocusedRoundId(round.id)}
+            >
+              <span className={`round-rail__glyph round-rail__glyph--${status}`}>{STATUS_GLYPH[status]}</span>
+              {compactLabel(stage, round)}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
       <div style={{ flex: '1 1 380px', minWidth: 320, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {isGroups && !hasResults ? (
@@ -113,6 +176,12 @@ export function CompetitionStageView({ sf, competition, event, stage, stageIndex
           ) : null}
         </div>
 
+        {(isGroups || stage.format.kind === 'league') && focusedRound ? (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+            {t('competitions.cockpit.afterRound', { round: focusedRound.name })}
+          </div>
+        ) : null}
+
         {isGroups && groupTables ? (
           <div className="standings-grid">
             {stage.groups.map((group) => (
@@ -146,9 +215,17 @@ export function CompetitionStageView({ sf, competition, event, stage, stageIndex
       </div>
 
       <div style={{ flex: '1 1 420px', minWidth: 360, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {stage.rounds.map((round) => (
-          <RoundCard key={round.id} sf={sf} event={event} stage={stage} round={round} stageRef={stageRef} />
-        ))}
+        {focusedRound ? (
+          <RoundCard
+            key={focusedRound.id}
+            sf={sf}
+            event={event}
+            stage={stage}
+            round={focusedRound}
+            stageRef={stageRef}
+          />
+        ) : null}
+      </div>
       </div>
 
       <GroupDrawModal
@@ -173,7 +250,7 @@ export function CompetitionStageView({ sf, competition, event, stage, stageIndex
         stageRef={stageRef}
         onClose={() => setRulesOpen(false)}
       />
-    </div>
+    </>
   );
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { setScore } from './mutate';
-import { adHocEntries, fillStage, getComp, rankOf, refFor, setUp } from './testkit';
+import { adHocEntries, fillStage, getComp, seedPos, refFor, setUp } from './testkit';
 
 const koSpec = (n: number, legs: 1 | 2, awayGoals = false) => ({
   name: 'Test Cup',
@@ -16,8 +16,8 @@ describe('knockout brackets', () => {
     const qf = stage?.rounds[0];
     expect(qf?.fixtures).toHaveLength(4);
     const pairs = (qf?.fixtures ?? []).map((fx) => [
-      rankOf(sf, competitionId, fx.homeEntryId ?? ''),
-      rankOf(sf, competitionId, fx.awayEntryId ?? ''),
+      seedPos(sf, competitionId, fx.homeEntryId ?? ''),
+      seedPos(sf, competitionId, fx.awayEntryId ?? ''),
     ]);
     expect(pairs).toEqual([
       [1, 8],
@@ -36,10 +36,10 @@ describe('knockout brackets', () => {
     const third = rounds[2]?.fixtures[0];
     const final = rounds[3]?.fixtures[0];
     expect(
-      [third?.homeEntryId, third?.awayEntryId].map((id) => rankOf(played, competitionId, id ?? '')).sort(),
+      [third?.homeEntryId, third?.awayEntryId].map((id) => seedPos(played, competitionId, id ?? '')).sort(),
     ).toEqual([3, 4]);
     expect(
-      [final?.homeEntryId, final?.awayEntryId].map((id) => rankOf(played, competitionId, id ?? '')).sort(),
+      [final?.homeEntryId, final?.awayEntryId].map((id) => seedPos(played, competitionId, id ?? '')).sort(),
     ).toEqual([1, 2]);
   });
 
@@ -78,13 +78,13 @@ describe('knockout brackets', () => {
     const r1 = stage?.rounds[0];
     const byes = (r1?.fixtures ?? []).filter((fx) => fx.isBye);
     expect(byes).toHaveLength(2);
-    expect(byes.map((fx) => rankOf(sf, competitionId, fx.homeEntryId ?? '')).sort()).toEqual([1, 2]);
+    expect(byes.map((fx) => seedPos(sf, competitionId, fx.homeEntryId ?? '')).sort()).toEqual([1, 2]);
     // Byes auto-advance without a result:
     const semis = stage?.rounds[1];
     const semiOccupants = (semis?.fixtures ?? [])
       .flatMap((fx) => [fx.homeEntryId, fx.awayEntryId])
       .filter((id): id is string => id !== null)
-      .map((id) => rankOf(sf, competitionId, id));
+      .map((id) => seedPos(sf, competitionId, id));
     expect(semiOccupants.sort()).toEqual([1, 2]);
   });
 

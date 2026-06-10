@@ -45,7 +45,7 @@ export function AssignSlotModal({ open, sf, event, onCancel, onAssign }: AssignS
                 <div className="list-row__title">{d.name}</div>
               </div>
               <span className="mono" style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                {entry.seeding.mode === 'rank' ? `#${entry.seeding.value}` : entry.seeding.value}
+                {entry.seeding % 1 === 0 ? entry.seeding : entry.seeding.toFixed(2)}
               </span>
             </button>
           );

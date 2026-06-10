@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Savefile } from '../domain/savefile';
 import type { Fixture, Round, SportEvent, Stage } from '../domain/spine';
 import type { FixtureRef, StageRef } from '../engine/mutate';
-import { roundResultsBBCode } from '../export/bbcode';
+import { matchdayPostBBCode } from '../export/bbcode';
 import { t } from '../lang';
 import {
   assignSlot,
@@ -161,13 +161,21 @@ export function RoundCard({ sf, event, stage, round, stageRef }: RoundCardProps)
   const published = round.fixtures.filter((fx) => fx.result?.lifecycle.status === 'published');
   const allPublished = results.length > 0 && published.length === results.length;
 
-  const copyResults = async () => {
-    const ok = await copyText(roundResultsBBCode(sf, event, round));
+  const copyPost = async () => {
+    const ok = await copyText(matchdayPostBBCode(sf, event, stage, round));
     if (ok) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     }
   };
+
+  // Groups stages render the matchday sectioned per group, like the forum post.
+  const sections =
+    stage.groups.length > 0
+      ? stage.groups
+          .map((g) => ({ label: g.name as string | null, fixtures: round.fixtures.filter((fx) => fx.groupId === g.id) }))
+          .filter((s) => s.fixtures.length > 0)
+      : [{ label: null, fixtures: round.fixtures }];
 
   return (
     <div className="panel round-card">
@@ -183,8 +191,8 @@ export function RoundCard({ sf, event, stage, round, stageRef }: RoundCardProps)
               {t('competitions.cockpit.partlyPublished', { done: published.length, total: results.length })}
             </span>
           ) : null}
-          <Button size="sm" onClick={() => void copyResults()}>
-            {copied ? t('common.copied') : t('competitions.cockpit.copyResults')}
+          <Button size="sm" onClick={() => void copyPost()}>
+            {copied ? t('common.copied') : t('competitions.cockpit.copyPost')}
           </Button>
           {!allPublished ? (
             <Button
@@ -206,7 +214,10 @@ export function RoundCard({ sf, event, stage, round, stageRef }: RoundCardProps)
       ) : null}
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {round.fixtures.map((fx) => {
+        {sections.map((section) => (
+          <div key={section.label ?? '__all__'}>
+            {section.label ? <div className="fixture-group-label">{section.label}</div> : null}
+            {section.fixtures.map((fx) => {
           const home = entryDisplay(sf, event, fx.homeEntryId);
           const away = entryDisplay(sf, event, fx.awayEntryId);
           const isPublished = fx.result?.lifecycle.status === 'published';
@@ -337,7 +348,9 @@ export function RoundCard({ sf, event, stage, round, stageRef }: RoundCardProps)
               ) : null}
             </div>
           );
-        })}
+            })}
+          </div>
+        ))}
       </div>
 
       <UnlockResultModal

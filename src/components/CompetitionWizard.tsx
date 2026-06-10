@@ -21,34 +21,40 @@ type Step = 0 | 1 | 2 | 3;
 
 const codeOf = (name: string) => name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || '???';
 
-/** "Name, CODE, rank" per line; code and rank optional. */
+/**
+ * "Name, CODE, rating" per line; code and rating optional. Ratings are decimal,
+ * higher = better, any internally consistent scale (KPB-style ~0–30, 0–100, …).
+ * Unrated lines get 0 and keep their paste order among themselves.
+ */
 function parsePastedEntries(text: string): EntryInput[] {
   const out: EntryInput[] = [];
   const lines = text
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
-  lines.forEach((line, i) => {
+  for (const line of lines) {
     const parts = line.split(',').map((p) => p.trim());
     const name = parts[0] ?? '';
-    if (!name) return;
+    if (!name) continue;
     let code = '';
-    let rank: number | null = null;
+    let rating: number | null = null;
     for (const part of parts.slice(1)) {
       const n = Number(part);
       if (part !== '' && Number.isFinite(n)) {
-        rank = n;
+        rating = n;
       } else if (part) {
         code = part;
       }
     }
     out.push({
       participant: { kind: 'ad-hoc', name, shortCode: (code || codeOf(name)).toUpperCase().slice(0, 5) },
-      seeding: { mode: 'rank', value: rank ?? i + 1 },
+      seeding: rating ?? 0,
     });
-  });
+  }
   return out;
 }
+
+const fmtSeed = (value: number) => (value % 1 === 0 ? String(value) : value.toFixed(2));
 
 interface WorldPick {
   key: string;
@@ -98,13 +104,7 @@ export function CompetitionWizard({ open, sf, onClose, onCreated }: CompetitionW
 
   const pasted = useMemo(() => parsePastedEntries(pasteText), [pasteText]);
   const entries: EntryInput[] = useMemo(
-    () => [
-      ...pasted,
-      ...picked.map((p) => ({
-        participant: p.ref,
-        seeding: { mode: 'rating' as const, value: p.rating },
-      })),
-    ],
+    () => [...pasted, ...picked.map((p) => ({ participant: p.ref, seeding: p.rating }))],
     [pasted, picked],
   );
 
@@ -393,7 +393,7 @@ export function CompetitionWizard({ open, sf, onClose, onCreated }: CompetitionW
               rows={10}
               value={pasteText}
               autoFocus
-              placeholder={'Qusmo, QUS, 1\nBrixton Hill, BRX, 2\nAppleton'}
+              placeholder={'Qusmo, QUS, 28.54\nBrixton Hill, BRX, 27.01\nAppleton'}
               onChange={(e) => setPasteText(e.target.value)}
             />
             <div className="field__hint">{t('competitions.wizard.entriesHint')}</div>
@@ -446,8 +446,8 @@ export function CompetitionWizard({ open, sf, onClose, onCreated }: CompetitionW
           <div className="panel" style={{ padding: 12, maxHeight: 220, overflowY: 'auto' }}>
             {entries.map((e, i) => (
               <div key={i} style={{ fontSize: 13, padding: '2px 0', display: 'flex', gap: 8 }}>
-                <span className="mono" style={{ color: 'var(--text-dim)', width: 24 }}>
-                  {e.seeding.mode === 'rank' ? `#${e.seeding.value}` : e.seeding.value}
+                <span className="mono" style={{ color: 'var(--text-dim)', width: 48, textAlign: 'right' }}>
+                  {fmtSeed(e.seeding)}
                 </span>
                 {participantDisplay(sf, e.participant).name}
               </div>

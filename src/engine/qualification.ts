@@ -10,10 +10,12 @@ export function tableConfigOf(stage: Stage): TableConfig {
   };
 }
 
-/** Better seed first. 'rank' = ascending (1 is best), 'rating' = descending. */
+/** Better seed first: higher rating wins; ties keep entry-list order (stable). */
 export function orderEntriesBySeeding(entries: Entry[]): Entry[] {
-  const key = (e: Entry) => (e.seeding.mode === 'rank' ? e.seeding.value : -e.seeding.value);
-  return [...entries].sort((a, b) => key(a) - key(b));
+  return [...entries]
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) => b.entry.seeding - a.entry.seeding || a.index - b.index)
+    .map((x) => x.entry);
 }
 
 export function stageGroupFixtures(stage: Stage, groupId: string) {
@@ -35,6 +37,28 @@ export function computeGroupTables(stage: Stage): Map<string, TableRow[]> {
 
 export function computeOverallTable(stage: Stage): TableRow[] {
   return computeTable(stage.entryIds, stageAllFixtures(stage), tableConfigOf(stage));
+}
+
+/** Cumulative standings as of a matchday: only rounds with index ≤ roundIndex count. */
+export function computeGroupTablesThrough(stage: Stage, roundIndex: number): Map<string, TableRow[]> {
+  const fixtures = stage.rounds.filter((r) => r.index <= roundIndex).flatMap((r) => r.fixtures);
+  const out = new Map<string, TableRow[]>();
+  for (const group of stage.groups) {
+    out.set(
+      group.id,
+      computeTable(
+        group.entryIds,
+        fixtures.filter((fx) => fx.groupId === group.id),
+        tableConfigOf(stage),
+      ),
+    );
+  }
+  return out;
+}
+
+export function computeOverallTableThrough(stage: Stage, roundIndex: number): TableRow[] {
+  const fixtures = stage.rounds.filter((r) => r.index <= roundIndex).flatMap((r) => r.fixtures);
+  return computeTable(stage.entryIds, fixtures, tableConfigOf(stage));
 }
 
 /** Every non-bye fixture has a result (occupants included — TBD slots fail this). */

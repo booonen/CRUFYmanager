@@ -8,11 +8,11 @@ export function mkSave(): Savefile {
   return createBlankSavefile({ countryName: 'Testland', countryShortCode: 'TST', matchdaysPerSeason: 10 });
 }
 
-/** n ad-hoc entries ranked 1..n (1 strongest). */
+/** n ad-hoc entries with descending seeding ratings (Nation 1 strongest). */
 export function adHocEntries(n: number): EntryInput[] {
   return Array.from({ length: n }, (_, i) => ({
     participant: { kind: 'ad-hoc' as const, name: `Nation ${i + 1}`, shortCode: `N${i + 1}` },
-    seeding: { mode: 'rank' as const, value: i + 1 },
+    seeding: n - i,
   }));
 }
 
@@ -46,12 +46,13 @@ export function refFor(
   };
 }
 
-/** Rank of an entry (its seeding value) — used to derive deterministic scores. */
-export function rankOf(sf: Savefile, competitionId: string, entryId: string): number {
+/** 1-based seed position of an entry (1 = highest rating) — for assertions. */
+export function seedPos(sf: Savefile, competitionId: string, entryId: string): number {
   const event = getComp(sf, competitionId).sportEvents[0];
-  const entry = event?.entries.find((e) => e.id === entryId);
+  if (!event) throw new Error('no event');
+  const entry = event.entries.find((e) => e.id === entryId);
   if (!entry) throw new Error('entry not found');
-  return entry.seeding.value;
+  return 1 + event.entries.filter((e) => e.seeding > entry.seeding).length;
 }
 
 export function entryName(sf: Savefile, competitionId: string, entryId: string | null): string {
@@ -64,13 +65,14 @@ export function entryName(sf: Savefile, competitionId: string, entryId: string |
 
 /**
  * Fills every open fixture of the stage (by index) with scores from scoreFn
- * (default: better rank wins 2–0). Returns the updated savefile.
+ * over the sides' seed positions (default: better-seeded side wins 2–0).
+ * Returns the updated savefile.
  */
 export function fillStage(
   sf: Savefile,
   competitionId: string,
   stageIndex: number,
-  scoreFn?: (homeRank: number, awayRank: number) => ScoreInput,
+  scoreFn?: (homeSeedPos: number, awaySeedPos: number) => ScoreInput,
 ): Savefile {
   let current = sf;
   const fn =
@@ -90,8 +92,8 @@ export function fillStage(
         if (fx.isBye || fx.result || !fx.homeEntryId || !fx.awayEntryId) continue;
         const ref = refFor(current, competitionId, stage, round, fx);
         const input = fn(
-          rankOf(current, competitionId, fx.homeEntryId),
-          rankOf(current, competitionId, fx.awayEntryId),
+          seedPos(current, competitionId, fx.homeEntryId),
+          seedPos(current, competitionId, fx.awayEntryId),
         );
         current = setScore(current, ref, input);
         progressed = true;

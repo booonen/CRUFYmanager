@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Savefile } from '../domain/savefile';
 import { forceSeedStage } from './mutate';
-import { adHocEntries, fillStage, getComp, rankOf, setUp } from './testkit';
+import { adHocEntries, fillStage, getComp, seedPos, setUp } from './testkit';
 
 const wcSpec = () => ({
   name: 'World Cup',
@@ -21,7 +21,7 @@ const wcSpec = () => ({
 
 function groupRanks(sf: Savefile, competitionId: string, stageIndex: number): number[][] {
   const stage = getComp(sf, competitionId).sportEvents[0]?.stages[stageIndex];
-  return (stage?.groups ?? []).map((g) => g.entryIds.map((id) => rankOf(sf, competitionId, id)));
+  return (stage?.groups ?? []).map((g) => g.entryIds.map((id) => seedPos(sf, competitionId, id)));
 }
 
 describe('groups → knockout qualification', () => {
@@ -49,12 +49,12 @@ describe('groups → knockout qualification', () => {
 
     // Winner/runner-up per group = best/second-best rank in the group.
     const winners = groups.map((g) =>
-      g.entryIds.map((id) => rankOf(current, competitionId, id)).sort((a, b) => a - b),
+      g.entryIds.map((id) => seedPos(current, competitionId, id)).sort((a, b) => a - b),
     );
     const expectPair = (fxIndex: number, winnerGroup: number, runnerGroup: number) => {
       const fx = r16?.fixtures[fxIndex];
-      expect(rankOf(current, competitionId, fx?.homeEntryId ?? '')).toBe(winners[winnerGroup]?.[0]);
-      expect(rankOf(current, competitionId, fx?.awayEntryId ?? '')).toBe(winners[runnerGroup]?.[1]);
+      expect(seedPos(current, competitionId, fx?.homeEntryId ?? '')).toBe(winners[winnerGroup]?.[0]);
+      expect(seedPos(current, competitionId, fx?.awayEntryId ?? '')).toBe(winners[runnerGroup]?.[1]);
     };
     // Standard cross: A1–B2, C1–D2, E1–F2, G1–H2, B1–A2, D1–C2, F1–E2, H1–G2.
     expectPair(0, 0, 1);
@@ -74,8 +74,8 @@ describe('groups → knockout qualification', () => {
     const ko = getComp(current, competitionId).sportEvents[0]?.stages[1];
     const final = ko?.rounds.at(-1)?.fixtures[0];
     expect(final?.result).not.toBeNull();
-    const homeRank = rankOf(current, competitionId, final?.homeEntryId ?? '');
-    const awayRank = rankOf(current, competitionId, final?.awayEntryId ?? '');
+    const homeRank = seedPos(current, competitionId, final?.homeEntryId ?? '');
+    const awayRank = seedPos(current, competitionId, final?.awayEntryId ?? '');
     expect(Math.min(homeRank, awayRank)).toBe(1);
     expect(Math.max(homeRank, awayRank)).toBe(2);
   });
@@ -123,7 +123,7 @@ describe('groups → knockout qualification', () => {
       .filter((id): id is string => id !== null);
     expect(new Set(occupants).size).toBe(16);
     // All six group winners and runners-up are in; exactly 4 of the 6 third-placers.
-    const ranks = occupants.map((id) => rankOf(current, competitionId, id));
+    const ranks = occupants.map((id) => seedPos(current, competitionId, id));
     const thirds = groupRanks(current, competitionId, 0).map(
       (g) => [...g].sort((a, b) => a - b)[2] ?? -1,
     );

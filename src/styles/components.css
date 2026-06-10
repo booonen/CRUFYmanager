@@ -1093,3 +1093,47 @@
   color: var(--accent);
   margin-top: 2px;
 }
+
+/* Matchday rail (per-competition calendar) */
+
+.round-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.round-rail__chip {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.round-rail__glyph {
+  font-size: 10px;
+}
+
+.round-rail__glyph--empty {
+  color: var(--text-muted);
+}
+
+.round-rail__glyph--partial {
+  color: var(--warn);
+}
+
+.round-rail__glyph--complete {
+  color: var(--success);
+}
+
+.round-rail__glyph--published {
+  color: var(--accent);
+}
+
+.fixture-group-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 8px 0 2px;
+}

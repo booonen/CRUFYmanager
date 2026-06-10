@@ -101,7 +101,6 @@ function EntriesPanel({ sf, competition, event }: { sf: Savefile; competition: C
           <tr>
             <th>{t('competitions.cockpit.entryCode')}</th>
             <th>{t('competitions.cockpit.entryName')}</th>
-            <th>{t('competitions.cockpit.seeding')}</th>
             <th>{t('competitions.cockpit.entrySeed')}</th>
           </tr>
         </thead>
@@ -112,34 +111,17 @@ function EntriesPanel({ sf, competition, event }: { sf: Savefile; competition: C
               <tr key={entry.id}>
                 <td className="mono">{d.code}</td>
                 <td>{d.name}</td>
-                <td>
-                  <select
-                    className="select"
-                    style={{ padding: '2px 6px', fontSize: 12 }}
-                    value={entry.seeding.mode}
-                    onChange={(e) =>
-                      setEntrySeeding({ competitionId: competition.id, eventId: event.id }, entry.id, {
-                        mode: e.target.value === 'rating' ? 'rating' : 'rank',
-                        value: entry.seeding.value,
-                      })
-                    }
-                  >
-                    <option value="rank">{t('competitions.cockpit.seedingRank')}</option>
-                    <option value="rating">{t('competitions.cockpit.seedingRating')}</option>
-                  </select>
-                </td>
-                <td style={{ width: 90 }}>
+                <td style={{ width: 110 }}>
                   <NumberInput
                     className="input"
-                    style={{ width: 72, padding: '2px 6px', fontSize: 12 }}
-                    value={entry.seeding.value}
+                    style={{ width: 88, padding: '2px 6px', fontSize: 12 }}
+                    value={entry.seeding}
                     min={0}
                     max={9999}
+                    step={0.01}
+                    allowFloat
                     onCommit={(value) =>
-                      setEntrySeeding({ competitionId: competition.id, eventId: event.id }, entry.id, {
-                        mode: entry.seeding.mode,
-                        value,
-                      })
+                      setEntrySeeding({ competitionId: competition.id, eventId: event.id }, entry.id, value)
                     }
                   />
                 </td>

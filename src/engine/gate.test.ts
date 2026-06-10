@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeOverallTable, stageComplete } from './qualification';
-import { roundResultsBBCode, stageTablesBBCode } from '../export/bbcode';
+import { matchdayPostBBCode, roundResultsBBCode, stageTablesBBCode } from '../export/bbcode';
 import { publishRound } from './mutate';
 import { spineWarnings } from './integrity';
 import { adHocEntries, fillStage, getComp, setUp } from './testkit';
@@ -55,18 +55,28 @@ describe('phase 2 gate rehearsal', () => {
     expect(ko?.rounds.map((r) => r.fixtures.length)).toEqual([8, 4, 2, 1, 1]);
     expect(ko?.rounds.every((r) => r.fixtures.every((fx) => fx.result !== null))).toBe(true);
 
-    // BBCode exports look like NS forum markup.
+    // BBCode exports look like real NS results posts: [box] per group, MD header,
+    // plain result lines, cumulative [pre] table.
     const stage0 = groups();
-    const tables = stage0 ? stageTablesBBCode(current, event() ?? (() => { throw new Error(); })(), stage0) : '';
-    expect(tables).toContain('[table]');
+    const ev = event();
+    if (!stage0 || !ev) throw new Error('structure missing');
+    const tables = stageTablesBBCode(current, ev, stage0);
+    expect(tables).toContain('[pre]');
     expect(tables).toContain('Group A');
     expect(tables).toContain('Nation 1');
+    expect(tables).toContain('Pts');
+
+    const md1 = stage0.rounds[0];
+    const post = md1 ? matchdayPostBBCode(current, ev, stage0, md1) : '';
+    expect(post).toContain('[box]');
+    expect(post).toContain('[b]MD1[/b]');
+    expect(post).toContain('[hr][/hr]');
+    expect(post).toMatch(/Nation \d+ \d+–\d+ Nation \d+/);
+    expect(post).toContain('[pre]');
+
     const lastRound = ko?.rounds.at(-1);
-    const results = lastRound
-      ? roundResultsBBCode(current, event() ?? (() => { throw new Error(); })(), lastRound)
-      : '';
-    expect(results).toContain('[b]');
-    expect(results).toMatch(/Nation \d+ \[b]\d+–\d+\[\/b] Nation \d+/);
+    const results = lastRound ? roundResultsBBCode(current, ev, lastRound) : '';
+    expect(results).toMatch(/Nation \d+ \d+–\d+ Nation \d+/);
   });
 
   it('runs a 12-team double round robin league', () => {
