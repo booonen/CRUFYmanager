@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
@@ -7,6 +7,7 @@ import type { Fixture, SportEvent } from '../domain/spine';
 import type { Savefile } from '../domain/savefile';
 import {
   matchdayIndex,
+  progressBlockers,
   roundStatus,
   type CalendarSlotEntry,
 } from '../engine/calendar';
@@ -96,9 +97,17 @@ export function CalendarMatchdayRoute() {
   const { md } = useParams<{ md: string }>();
   const savefile = useSavefileStore((s) => s.savefile);
   const matchday = Number(md);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const entries = useMemo(
     () => (savefile ? (matchdayIndex(savefile).get(matchday) ?? []) : []),
+    [savefile, matchday],
+  );
+  const blockedBy = useMemo(
+    () =>
+      savefile && Number.isInteger(matchday) && matchday > savefile.calendar.currentMatchday
+        ? progressBlockers(savefile, matchday)
+        : [],
     [savefile, matchday],
   );
 
@@ -117,16 +126,35 @@ export function CalendarMatchdayRoute() {
   }
 
   const isCurrent = matchday === savefile.calendar.currentMatchday;
+  const isPast = matchday < savefile.calendar.currentMatchday;
+  const setCurrentDisabled = isPast || blockedBy.length > 0;
 
   return (
     <>
       <PageHeading
         title={t('calendar.onMatchday', { md: matchday })}
-        sub={isCurrent ? t('calendar.current') : undefined}
+        sub={isCurrent ? t('calendar.current') : isPast ? t('calendar.pastLocked') : undefined}
         actions={
           <div style={{ display: 'flex', gap: 6 }}>
             {!isCurrent ? (
-              <Button size="sm" onClick={() => setCurrentMatchday(matchday)}>
+              <Button
+                size="sm"
+                disabled={setCurrentDisabled}
+                title={
+                  isPast
+                    ? t('calendar.noTimeTravel')
+                    : blockedBy.length > 0
+                      ? t('calendar.advanceBlocked', {
+                          count: blockedBy.length,
+                          md: savefile.calendar.currentMatchday,
+                        })
+                      : undefined
+                }
+                onClick={() => {
+                  const result = setCurrentMatchday(matchday);
+                  setActionError(result.ok ? null : result.message);
+                }}
+              >
                 {t('calendar.setCurrent')}
               </Button>
             ) : null}
@@ -136,6 +164,16 @@ export function CalendarMatchdayRoute() {
           </div>
         }
       />
+
+      {actionError ? (
+        <div
+          className="mono"
+          style={{ color: 'var(--danger)', fontSize: 12, marginBottom: 10, cursor: 'pointer' }}
+          onClick={() => setActionError(null)}
+        >
+          {actionError}
+        </div>
+      ) : null}
 
       {entries.length === 0 ? (
         <div className="panel" style={{ padding: 16, color: 'var(--text-dim)', fontSize: 13 }}>

@@ -72,3 +72,26 @@ export function unscheduledRounds(sf: Savefile): CalendarSlotEntry[] {
   }
   return out;
 }
+
+/**
+ * Rounds standing in the way of moving the current matchday to `targetMd`:
+ * every round on a day in [currentMatchday, targetMd) must be fully published
+ * (playable fixtures all have published results) before time moves past it.
+ */
+export function progressBlockers(sf: Savefile, targetMd: number): CalendarSlotEntry[] {
+  const index = matchdayIndex(sf);
+  const out: CalendarSlotEntry[] = [];
+  for (let md = sf.calendar.currentMatchday; md < targetMd; md++) {
+    for (const entry of index.get(md) ?? []) {
+      const playable = entry.round.fixtures.filter((fx) => !fx.isBye);
+      if (playable.length === 0) continue;
+      if (roundStatus(entry.round) !== 'published') out.push(entry);
+    }
+  }
+  return out;
+}
+
+/** Blockers for a plain "advance by one" (the common case). */
+export function advanceBlockers(sf: Savefile): CalendarSlotEntry[] {
+  return progressBlockers(sf, sf.calendar.currentMatchday + 1);
+}

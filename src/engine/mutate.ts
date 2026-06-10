@@ -334,11 +334,20 @@ export function setRoundMatchday(sf: Savefile, ref: RoundRef, matchday: number |
   if (matchday !== null && (matchday < 1 || matchday > sf.calendar.matchdaysPerSeason)) {
     throw new SpineGuardError(`matchday must be 1–${sf.calendar.matchdaysPerSeason} (or unscheduled)`);
   }
+  // The past is history: rounds already behind the current matchday stay put,
+  // and nothing new may be scheduled before today.
+  if (matchday !== null && matchday < sf.calendar.currentMatchday) {
+    throw new SpineGuardError('cannot schedule into a past matchday');
+  }
   return mapStage(sf, ref, (stage) => ({
     ...stage,
-    rounds: stage.rounds.map(
-      (round): Round => (round.id === ref.roundId ? { ...round, calendarMatchday: matchday } : round),
-    ),
+    rounds: stage.rounds.map((round): Round => {
+      if (round.id !== ref.roundId) return round;
+      if (round.calendarMatchday !== null && round.calendarMatchday < sf.calendar.currentMatchday) {
+        throw new SpineGuardError('past matchdays are locked');
+      }
+      return { ...round, calendarMatchday: matchday };
+    }),
   }));
 }
 

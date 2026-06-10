@@ -287,6 +287,12 @@ export const en = {
     mdHint: 'Global calendar matchday · 0 = unscheduled',
     setCurrent: 'Set as current',
     back: 'Back to calendar',
+    jumpToCurrent: 'Go to current',
+    pageLabel: 'MD {from}–{to} of {total}',
+    advanceBlocked: '{count} round(s) with unpublished results on or after MD {md} — publish them to move on.',
+    seasonEnd: 'End of the season — rollover arrives in Phase 5.',
+    noTimeTravel: 'The current matchday cannot move backwards.',
+    pastLocked: 'Past matchday — locked.',
     results: '{done}/{total} results',
     status: {
       empty: 'Open',
