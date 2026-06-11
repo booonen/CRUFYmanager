@@ -20,7 +20,7 @@ import { useSavefileStore } from '../stores/savefile';
 import { SPORT_ICON } from '../utils/sport';
 
 const DRAG_MIME = 'application/x-crufy-round';
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 24;
 
 function dragPayload(entry: CalendarSlotEntry): string {
   const ref: RoundRef = {
