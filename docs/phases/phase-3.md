@@ -78,3 +78,12 @@ Calibration (1 000 fixed-seed sims each): equals → draws 22–30%, wins symmet
 - **Q2 — Rating scales**: how should the engine interpret gaps across events with different scales (football ~0–30 vs Olympic 0–100)?
 - **Q3 — Bonus aggregation**: how do multiple graded RPs combine into one bonus?
 - **Q4 — Stub scorers**: when entries have no players, do generated match details use anonymous minutes or invented stand-in names?
+
+---
+
+## 8. Resolved decisions (question round outcome, 2026-06-10)
+
+- **Q1 — Build the model now.** Engine ships on the proposal's Poisson/logistic model; when the user pastes the reference sheet's formulas later, we compare and recalibrate in a follow-up round.
+- **Q2 — Zero-anchored scale.** *"Zero is always the bottom anchor. Scale from zero to max, or from zero to an arbitrary number that the user has provided as max rank."* No class-gap parameter: ratings normalize as `rating / ratingMax`, where `ratingMax` is per-event — host-provided, defaulting to the highest entry seeding. The gap the curve sees is `(effA − effB) / ratingMax` ∈ [−1, 1].
+- **Q3 — Bonus values are host-computed; grading is out of scope.** *"Hosts will input (or rather, import) bonus values at each matchday. The exact grading system … is out of scope — hosts will calculate boni themselves."* §3's `RpGradingConfig` (scaleMin/scaleMax/weightInGaps/aggregation) is **deleted**. The ledger becomes `BonusEntry { matchday, value, note }` in plain rating units; at sim time a team's bonus is the latest value with `matchday ≤` the round's matchday. Bulk import per matchday ("CODE, value" lines) is the primary input path. The §1.2 grade-scale invariance test morphs into rating-scale invariance: ratings+bonuses+ratingMax scaled together ⇒ identical results for identical seeds.
+- **Q4 — No detail for rank-only entries (the U model).** *"No players = no player simming."* Match detail generation (scorers, minutes — even anonymous) is gated on player-backed entries and deferred with the deep-elaboration layer; Phase 3 sims produce scorelines (+ ET/pens) only. `detail` stays `null`; `dictated-sim` provenance stays in the type for that later phase. Phase 3 scope tightens to: params, bonus ledger + import, outcome engine, seeds/replay/re-roll, sim UX, Sim Lab, calibration suite.
