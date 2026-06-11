@@ -9,15 +9,22 @@ import {
   clearResult,
   deleteCompetition,
   forceSeedStage,
+  importBonusValues,
   publishResult,
   publishRound,
+  removeBonus,
   renameRound,
+  setEventRatingMax,
   setManualTieOrder,
   setRoundMatchday,
   setScore,
   setStageRules,
+  simFixture,
+  simRoundEmpties,
   unlockResult,
   updateEntrySeeding,
+  upsertBonus,
+  type BonusInput,
   type EventRef,
   type FixtureRef,
   type RoundRef,
@@ -117,4 +124,39 @@ export function forceSeed(ref: EventRef, targetStageIndex: number): SpineActionR
 
 export function setEntrySeeding(ref: EventRef, entryId: string, seeding: EntrySeeding): SpineActionResult {
   return mutateSpine((sf) => updateEntrySeeding(sf, ref, entryId, seeding));
+}
+
+export function simFixtureAction(ref: FixtureRef): SpineActionResult {
+  return mutateSpine((sf) => simFixture(sf, ref));
+}
+
+export function simRoundAction(ref: RoundRef): SpineActionResult {
+  return mutateSpine((sf) => simRoundEmpties(sf, ref));
+}
+
+export function upsertBonusAction(ref: EventRef, entryId: string, input: BonusInput): SpineActionResult {
+  return mutateSpine((sf) => upsertBonus(sf, ref, entryId, input));
+}
+
+export function removeBonusAction(ref: EventRef, entryId: string, bonusId: string): SpineActionResult {
+  return mutateSpine((sf) => removeBonus(sf, ref, entryId, bonusId));
+}
+
+export function importBonusAction(
+  ref: EventRef,
+  matchday: number | null,
+  rows: { entryId: string; value: number }[],
+): SpineActionResult {
+  return mutateSpine((sf) => importBonusValues(sf, ref, matchday, rows));
+}
+
+export function setRatingMaxAction(ref: EventRef, value: number | null): SpineActionResult {
+  return mutateSpine((sf) => setEventRatingMax(sf, ref, value));
+}
+
+export function updateSimParams(patch: Partial<import('../domain/scorination').SimParams>): void {
+  useSavefileStore.getState().updateSavefile((sf) => ({
+    ...sf,
+    scorination: { ...sf.scorination, sim: { ...sf.scorination.sim, ...patch } },
+  }));
 }

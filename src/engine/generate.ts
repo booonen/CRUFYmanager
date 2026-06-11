@@ -426,6 +426,7 @@ export function createCompetitionFromSpec(spec: CompetitionSpec): Competition {
     id: newId(),
     name: spec.name,
     sport: 'football',
+    ratingMax: null,
     entries,
     stages,
   };

@@ -1516,3 +1516,15 @@
   opacity: 0.55;
   cursor: default;
 }
+
+/* Sim provenance chips */
+
+.prov-chip {
+  font-size: 9px;
+  letter-spacing: 0.05em;
+}
+
+.prov-chip--drift {
+  color: var(--warn);
+  border-color: var(--warn);
+}

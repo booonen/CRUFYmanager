@@ -1,11 +1,16 @@
 import type { ParticipantRef } from './participant';
 
-/** A graded RP. Schema ships in Phase 2; grading UI and Bonus math arrive in Phase 3. */
-export interface RpGrade {
+/**
+ * A host-computed bonus value fed in at a matchday (grading systems are the
+ * host's business — plan §1.2 / phase-3 Q3). At sim time a team's bonus is the
+ * latest value with matchday ≤ the round's matchday (null matchday = baseline).
+ * Values are plain rating units, additive on the seeding.
+ */
+export interface BonusEntry {
   id: string;
-  roundId: string | null;
-  label: string;
-  grade: number;
+  matchday: number | null;
+  value: number;
+  note: string;
 }
 
 /**
@@ -21,5 +26,5 @@ export interface Entry {
   id: string;
   participant: ParticipantRef;
   seeding: EntrySeeding;
-  bonus: RpGrade[];
+  bonus: BonusEntry[];
 }

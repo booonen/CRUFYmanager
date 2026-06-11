@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { BonusImportModal } from '../components/BonusImportModal';
+import { BonusLedgerModal } from '../components/BonusLedgerModal';
 import { Button } from '../components/Button';
 import { CompetitionStageView } from '../components/CompetitionStageView';
 import { EmptyState } from '../components/EmptyState';
@@ -7,8 +9,9 @@ import { NumberInput } from '../components/NumberInput';
 import { PageHeading } from '../components/PageHeading';
 import type { Savefile } from '../domain/savefile';
 import type { Competition, SportEvent } from '../domain/spine';
+import { bonusAt, eventRatingMax } from '../engine/simulate';
 import { t } from '../lang';
-import { setEntrySeeding, useCompetition } from '../stores/competitions';
+import { setEntrySeeding, setRatingMaxAction, useCompetition } from '../stores/competitions';
 import { useSavefileStore } from '../stores/savefile';
 import { entryDisplay } from '../utils/participants';
 
@@ -103,19 +106,50 @@ export function CompetitionDetailRoute() {
 }
 
 function EntriesPanel({ sf, competition, event }: { sf: Savefile; competition: Competition; event: SportEvent }) {
+  const eventRef = { competitionId: competition.id, eventId: event.id };
+  const [importOpen, setImportOpen] = useState(false);
+  const [ledgerEntryId, setLedgerEntryId] = useState<string | null>(null);
+  const currentMd = sf.calendar.currentMatchday;
+  const autoMax = Math.max(0, ...event.entries.map((e) => e.seeding));
+  const ledgerEntry = event.entries.find((e) => e.id === ledgerEntryId) ?? null;
+
   return (
-    <div className="panel" style={{ padding: 12, maxWidth: 640 }}>
+    <div className="panel" style={{ padding: 12, maxWidth: 760 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginBottom: 10, flexWrap: 'wrap' }}>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label className="field__label">{t('competitions.cockpit.ratingMaxLabel')}</label>
+          <NumberInput
+            className="input"
+            style={{ width: 90 }}
+            value={event.ratingMax ?? 0}
+            min={0}
+            max={99999}
+            step={0.01}
+            allowFloat
+            onCommit={(v) => setRatingMaxAction(eventRef, v === 0 ? null : v)}
+          />
+          <div className="field__hint">{t('competitions.cockpit.ratingMaxHint', { auto: autoMax })}</div>
+        </div>
+        <Button size="sm" onClick={() => setImportOpen(true)}>
+          {t('competitions.cockpit.importBonus')}
+        </Button>
+      </div>
+
       <table className="data-table" style={{ width: '100%' }}>
         <thead>
           <tr>
             <th>{t('competitions.cockpit.entryCode')}</th>
             <th>{t('competitions.cockpit.entryName')}</th>
             <th>{t('competitions.cockpit.entrySeed')}</th>
+            <th>{t('competitions.cockpit.bonusCol')}</th>
+            <th>{t('competitions.cockpit.effCol')}</th>
+            <th />
           </tr>
         </thead>
         <tbody>
           {event.entries.map((entry) => {
             const d = entryDisplay(sf, event, entry.id);
+            const bonus = bonusAt(entry, currentMd);
             return (
               <tr key={entry.id}>
                 <td className="mono">{d.code}</td>
@@ -129,10 +163,19 @@ function EntriesPanel({ sf, competition, event }: { sf: Savefile; competition: C
                     max={9999}
                     step={0.01}
                     allowFloat
-                    onCommit={(value) =>
-                      setEntrySeeding({ competitionId: competition.id, eventId: event.id }, entry.id, value)
-                    }
+                    onCommit={(value) => setEntrySeeding(eventRef, entry.id, value)}
                   />
+                </td>
+                <td className="mono" style={{ color: bonus !== 0 ? 'var(--accent)' : 'var(--text-muted)' }}>
+                  {bonus > 0 ? `+${bonus}` : bonus}
+                </td>
+                <td className="mono" style={{ fontWeight: 700 }}>
+                  {Number((entry.seeding + bonus).toFixed(2))}
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  <Button size="sm" onClick={() => setLedgerEntryId(entry.id)}>
+                    ✎
+                  </Button>
                 </td>
               </tr>
             );
@@ -140,8 +183,26 @@ function EntriesPanel({ sf, competition, event }: { sf: Savefile; competition: C
         </tbody>
       </table>
       <div className="field__hint" style={{ marginTop: 8 }}>
-        {t('competitions.cockpit.entrySeedHint')}
+        {t('competitions.cockpit.entrySeedHint')} · {t('competitions.cockpit.effCol')} ={' '}
+        {t('competitions.cockpit.entrySeed')} + {t('competitions.cockpit.bonusCol')} @ MD{currentMd} /max{' '}
+        {eventRatingMax(event)}
       </div>
+
+      <BonusImportModal
+        open={importOpen}
+        sf={sf}
+        event={event}
+        eventRef={eventRef}
+        onClose={() => setImportOpen(false)}
+      />
+      <BonusLedgerModal
+        open={ledgerEntry !== null}
+        entry={ledgerEntry}
+        entryName={ledgerEntry ? entryDisplay(sf, event, ledgerEntry.id).name : ''}
+        eventRef={eventRef}
+        matchdaysPerSeason={sf.calendar.matchdaysPerSeason}
+        onClose={() => setLedgerEntryId(null)}
+      />
     </div>
   );
 }

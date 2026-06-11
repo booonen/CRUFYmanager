@@ -1,5 +1,6 @@
 import type { Savefile } from '../domain/savefile';
 import { SCHEMA_VERSION } from '../domain/savefile';
+import { DEFAULT_SCORINATION } from '../domain/scorination';
 
 export type Migration = (savefile: Savefile) => Savefile;
 
@@ -20,6 +21,12 @@ const migrations: Record<number, Migration> = {};
  */
 function normalizeBaseline(savefile: Savefile): Savefile {
   let touched = false;
+  // Phase 3 additions: per-save sim params, per-event rating scale max.
+  let scorination = savefile.scorination;
+  if (!scorination || !scorination.sim) {
+    scorination = { sim: { ...DEFAULT_SCORINATION.sim } };
+    touched = true;
+  }
   const competitions = savefile.competitions.map((comp) => {
     let md = 1;
     return {
@@ -56,11 +63,13 @@ function normalizeBaseline(savefile: Savefile): Savefile {
           }),
         }));
 
-        return { ...event, entries, stages };
+        const ratingMax = (event as { ratingMax?: number | null }).ratingMax;
+        if (ratingMax === undefined) touched = true;
+        return { ...event, ratingMax: ratingMax ?? null, entries, stages };
       }),
     };
   });
-  return touched ? { ...savefile, competitions } : savefile;
+  return touched ? { ...savefile, competitions, scorination } : savefile;
 }
 
 export function migrate(savefile: Savefile): Savefile {

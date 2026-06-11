@@ -4,6 +4,7 @@ import type { HistoryArchive } from './history';
 import type { NationalTeam } from './nationalTeam';
 import type { Savefile } from './savefile';
 import { SCHEMA_VERSION } from './savefile';
+import { DEFAULT_SCORINATION } from './scorination';
 import { DEFAULT_SETTINGS } from './settings';
 import { makeFreeAgentsClub } from '../utils/freeAgents';
 
@@ -59,6 +60,7 @@ export function createBlankSavefile(input: NewSavefileInput): Savefile {
     foreignWorld: emptyForeignWorld(),
     otherMatches: [],
     history: emptyHistory(),
+    scorination: { sim: { ...DEFAULT_SCORINATION.sim } },
     settings: { ...DEFAULT_SETTINGS },
   };
 }

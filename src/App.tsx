@@ -16,6 +16,7 @@ import { OtherMatchesRoute } from './routes/OtherMatches';
 import { PlayerDetailRoute } from './routes/PlayerDetail';
 import { PlayersRoute } from './routes/Players';
 import { SavesRoute } from './routes/Saves';
+import { SimLabRoute } from './routes/SimLab';
 import { WorldRoute } from './routes/World';
 import { useSavefileStore } from './stores/savefile';
 
@@ -48,6 +49,7 @@ export function App() {
         <Route path="/other-matches" element={<OtherMatchesRoute />} />
         <Route path="/history" element={<HistoryRoute />} />
         <Route path="/world" element={<WorldRoute />} />
+        <Route path="/sim-lab" element={<SimLabRoute />} />
         <Route path="/saves" element={<SavesRoute />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>

@@ -5,6 +5,7 @@ import { CompetitionWizard } from '../components/CompetitionWizard';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { EmptyState } from '../components/EmptyState';
 import { PageHeading } from '../components/PageHeading';
+import { ScorinationSettingsModal } from '../components/ScorinationSettingsModal';
 import type { Competition } from '../domain/spine';
 import { t } from '../lang';
 import { removeCompetition, useCompetitions } from '../stores/competitions';
@@ -32,6 +33,7 @@ export function CompetitionsRoute() {
   const competitions = useCompetitions();
   const navigate = useNavigate();
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Competition | null>(null);
 
   if (status !== 'ready' || !savefile) {
@@ -55,9 +57,14 @@ export function CompetitionsRoute() {
         title={t('nav.competitions')}
         sub={t('competitions.sub')}
         actions={
-          <Button variant="primary" onClick={() => setWizardOpen(true)}>
-            {t('competitions.new')}
-          </Button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Button size="sm" onClick={() => setSettingsOpen(true)}>
+              ⚙ {t('competitions.cockpit.settings')}
+            </Button>
+            <Button variant="primary" onClick={() => setWizardOpen(true)}>
+              {t('competitions.new')}
+            </Button>
+          </div>
         }
       />
 
@@ -112,6 +119,11 @@ export function CompetitionsRoute() {
         sf={savefile}
         onClose={() => setWizardOpen(false)}
         onCreated={(id) => navigate(`/competitions/${id}`)}
+      />
+      <ScorinationSettingsModal
+        open={settingsOpen}
+        params={savefile.scorination.sim}
+        onClose={() => setSettingsOpen(false)}
       />
       <ConfirmModal
         open={deleteTarget !== null}

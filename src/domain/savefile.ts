@@ -7,6 +7,7 @@ import type { Manager } from './manager';
 import type { NationalTeam } from './nationalTeam';
 import type { OtherMatch } from './otherMatches';
 import type { Player } from './player';
+import type { ScorinationSettings } from './scorination';
 import type { UserSettings } from './settings';
 
 export const SCHEMA_VERSION = 1;
@@ -30,6 +31,7 @@ export interface Savefile {
   foreignWorld: ForeignWorld;
   otherMatches: OtherMatch[];
   history: HistoryArchive;
+  scorination: ScorinationSettings;
   settings: UserSettings;
 }
 

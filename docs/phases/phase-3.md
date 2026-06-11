@@ -1,6 +1,6 @@
 # Phase 3 Design Proposal — The Football Engine
 
-> **Status:** proposal — question round pending.
+> **Status:** implemented 2026-06-10 — question round resolved in §8 (which **supersedes §2–§4 where they conflict**: zero-anchored scale, host-fed bonus values, no detail generation for rank-only entries). Gate verification on the deployed site owed alongside Phase 2's.
 
 Companion to `CRUFY_PLAN_2.md` (canonical, esp. §1.2–§1.3 ratified decisions and §5). Restates the goal and gate, lists every concrete decision, flags deviations, ends with the question round.
 

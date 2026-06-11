@@ -14,6 +14,14 @@ import type { Savefile } from '../domain/savefile';
 import { newId } from '../utils/ids';
 import { buildGroupRounds, createCompetitionFromSpec, type CompetitionSpec } from './generate';
 import { reflowEvent } from './qualification';
+import {
+  ENGINE_VERSION,
+  bonusAt,
+  eventRatingMax,
+  simInputsDigest,
+  simulateMatch,
+  type SimMatchInput,
+} from './simulate';
 
 /**
  * The only write-path for spine data (plan §4.7): published results refuse
@@ -232,6 +240,149 @@ export function unlockResult(sf: Savefile, ref: FixtureRef, note: string): Savef
       },
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Simulation (Phase 3)
+
+function locate(sf: Savefile, ref: FixtureRef) {
+  const comp = sf.competitions.find((c) => c.id === ref.competitionId);
+  const event = comp?.sportEvents.find((e) => e.id === ref.eventId);
+  const stage = event?.stages.find((s) => s.id === ref.stageId);
+  const round = stage?.rounds.find((r) => r.id === ref.roundId);
+  const fixture = round?.fixtures.find((f) => f.id === ref.fixtureId);
+  if (!comp || !event || !stage || !round || !fixture) {
+    throw new SpineGuardError('fixture not found');
+  }
+  return { comp, event, stage, round, fixture };
+}
+
+/** Everything the engine sees for this fixture — also used for drift warnings. */
+export function simInputForFixture(sf: Savefile, ref: FixtureRef): SimMatchInput {
+  const { event, stage, round, fixture } = locate(sf, ref);
+  const home = event.entries.find((e) => e.id === fixture.homeEntryId);
+  const away = event.entries.find((e) => e.id === fixture.awayEntryId);
+  if (!home || !away) {
+    throw new SpineGuardError('both slots must be filled before simming');
+  }
+  const md = round.calendarMatchday;
+  return {
+    homeRating: home.seeding + bonusAt(home, md),
+    awayRating: away.seeding + bonusAt(away, md),
+    ratingMax: eventRatingMax(event),
+    params: sf.scorination.sim,
+    knockout: stage.format.kind === 'knockout' || stage.format.kind === 'single-match',
+  };
+}
+
+/** Fresh-seed sim (or re-roll on a draft). Never publishes; reflows downstream. */
+export function simFixture(sf: Savefile, ref: FixtureRef): Savefile {
+  const input = simInputForFixture(sf, ref);
+  const seed = newId();
+  const out = simulateMatch(input, seed);
+  const next = mapFixture(sf, ref, (fx) => {
+    guardDraft(fx);
+    if (fx.isBye) throw new SpineGuardError('byes have no result');
+    if (!fx.homeEntryId || !fx.awayEntryId) {
+      throw new SpineGuardError('both slots must be filled before simming');
+    }
+    const payload: ResultEnvelope['payload'] = {
+      family: 'score',
+      score: [out.home, out.away],
+      decidedBy: out.decidedBy,
+      shootout: out.shootout,
+      detail: null,
+    };
+    const provenance: ResultEnvelope['provenance'] = {
+      method: 'sim',
+      seed,
+      engineVersion: ENGINE_VERSION,
+      inputsDigest: simInputsDigest(input),
+    };
+    const result: ResultEnvelope = fx.result
+      ? { ...fx.result, payload, provenance, modifiedAt: nowIso() }
+      : {
+          id: newId(),
+          competitors: [fx.homeEntryId, fx.awayEntryId],
+          payload,
+          provenance,
+          lifecycle: { status: 'draft', publishedAt: null, unlocks: [] },
+          modifiedAt: nowIso(),
+        };
+    return { ...fx, result };
+  });
+  return reflow(next, ref);
+}
+
+/** Sims only the round's untouched fixtures — manual/dictated drafts stay. */
+export function simRoundEmpties(sf: Savefile, ref: RoundRef): Savefile {
+  let current = sf;
+  const stage = current.competitions
+    .find((c) => c.id === ref.competitionId)
+    ?.sportEvents.find((e) => e.id === ref.eventId)
+    ?.stages.find((s) => s.id === ref.stageId);
+  const target = stage?.rounds.find((r) => r.id === ref.roundId);
+  if (!target) throw new SpineGuardError('round not found');
+  for (const fx of target.fixtures) {
+    if (fx.isBye || fx.result !== null || !fx.homeEntryId || !fx.awayEntryId) continue;
+    current = simFixture(current, { ...ref, fixtureId: fx.id });
+  }
+  return current;
+}
+
+// ---------------------------------------------------------------------------
+// Bonus ledger (host-computed values; phase-3 Q3)
+
+export interface BonusInput {
+  matchday: number | null;
+  value: number;
+  note: string;
+}
+
+export function upsertBonus(sf: Savefile, ref: EventRef, entryId: string, input: BonusInput): Savefile {
+  return mapEvent(sf, ref, (ev) => ({
+    ...ev,
+    entries: ev.entries.map((entry): Entry => {
+      if (entry.id !== entryId) return entry;
+      const existing = entry.bonus.find((b) => b.matchday === input.matchday);
+      const bonus = existing
+        ? entry.bonus.map((b) =>
+            b.id === existing.id ? { ...b, value: input.value, note: input.note } : b,
+          )
+        : [...entry.bonus, { id: newId(), matchday: input.matchday, value: input.value, note: input.note }];
+      return { ...entry, bonus };
+    }),
+  }));
+}
+
+export function removeBonus(sf: Savefile, ref: EventRef, entryId: string, bonusId: string): Savefile {
+  return mapEvent(sf, ref, (ev) => ({
+    ...ev,
+    entries: ev.entries.map((entry): Entry =>
+      entry.id === entryId ? { ...entry, bonus: entry.bonus.filter((b) => b.id !== bonusId) } : entry,
+    ),
+  }));
+}
+
+/** Bulk import: one matchday, many teams ("CODE, value" paste resolved upstream). */
+export function importBonusValues(
+  sf: Savefile,
+  ref: EventRef,
+  matchday: number | null,
+  rows: { entryId: string; value: number }[],
+): Savefile {
+  let current = sf;
+  for (const row of rows) {
+    current = upsertBonus(current, ref, row.entryId, { matchday, value: row.value, note: '' });
+  }
+  return current;
+}
+
+export function setEventRatingMax(sf: Savefile, ref: EventRef, value: number | null): Savefile {
+  if (value !== null && value <= 0) {
+    throw new SpineGuardError('rating scale max must be positive');
+  }
+  return mapEvent(sf, ref, (ev) => ({ ...ev, ratingMax: value }));
 }
 
 // ---------------------------------------------------------------------------

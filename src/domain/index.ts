@@ -9,4 +9,5 @@ export * from './nationalTeam';
 export * from './otherMatches';
 export * from './player';
 export * from './savefile';
+export * from './scorination';
 export * from './settings';

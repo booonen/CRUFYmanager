@@ -4,12 +4,16 @@ import type { Fixture, Round, SportEvent, Stage } from '../domain/spine';
 import type { FixtureRef, StageRef } from '../engine/mutate';
 import { matchdayPostBBCode } from '../export/bbcode';
 import { t } from '../lang';
+import { simInputForFixture } from '../engine/mutate';
+import { simInputsDigest } from '../engine/simulate';
 import {
   assignSlot,
   clearFixtureResult,
   enterScore,
   publishRoundAction,
   setRoundMatchdayAction,
+  simFixtureAction,
+  simRoundAction,
   unlockResultAction,
   type SpineActionResult,
 } from '../stores/competitions';
@@ -162,6 +166,21 @@ export function RoundCard({ sf, event, stage, round, stageRef }: RoundCardProps)
   const results = round.fixtures.filter((fx) => fx.result !== null);
   const published = round.fixtures.filter((fx) => fx.result?.lifecycle.status === 'published');
   const allPublished = results.length > 0 && published.length === results.length;
+  const openFixtures = round.fixtures.filter(
+    (fx) => !fx.isBye && fx.result === null && fx.homeEntryId !== null && fx.awayEntryId !== null,
+  );
+
+  /** Drift check: sim inputs changed since this result was rolled. */
+  const driftedTitle = (fx: Fixture): string | null => {
+    const prov = fx.result?.provenance;
+    if (!prov || prov.method !== 'sim') return null;
+    try {
+      const now = simInputsDigest(simInputForFixture(sf, refFor(fx)));
+      return now !== prov.inputsDigest ? t('competitions.cockpit.driftWarning') : null;
+    } catch {
+      return null;
+    }
+  };
 
   const copyPost = async () => {
     const ok = await copyText(matchdayPostBBCode(sf, event, stage, round));
@@ -216,6 +235,11 @@ export function RoundCard({ sf, event, stage, round, stageRef }: RoundCardProps)
             <span className="chip" style={{ fontSize: 11 }}>
               {t('competitions.cockpit.partlyPublished', { done: published.length, total: results.length })}
             </span>
+          ) : null}
+          {openFixtures.length > 0 ? (
+            <Button size="sm" onClick={() => run(simRoundAction({ ...stageRef, roundId: round.id }))}>
+              🎲 {t('competitions.cockpit.simRound')}
+            </Button>
           ) : null}
           <Button size="sm" onClick={() => void copyPost()}>
             {copied ? t('common.copied') : t('competitions.cockpit.copyPost')}
@@ -301,6 +325,34 @@ export function RoundCard({ sf, event, stage, round, stageRef }: RoundCardProps)
               <span className="mono fixture-code">{fx.awayEntryId ? away.code : ''}</span>
 
               <span className="fixture-actions">
+                {fx.result ? (
+                  <span
+                    className={`chip prov-chip ${driftedTitle(fx) ? 'prov-chip--drift' : ''}`}
+                    title={
+                      (fx.result.provenance.method === 'sim'
+                        ? t('competitions.cockpit.provSimTitle', { seed: fx.result.provenance.seed ?? '' })
+                        : t('competitions.cockpit.provManualTitle')) +
+                      (driftedTitle(fx) ? ` — ${driftedTitle(fx)}` : '')
+                    }
+                  >
+                    {fx.result.provenance.method === 'sim' ? 'S' : 'M'}
+                    {driftedTitle(fx) ? '⚠' : ''}
+                  </span>
+                ) : null}
+                {!isPublished &&
+                fx.homeEntryId &&
+                fx.awayEntryId &&
+                (fx.result === null || fx.result.provenance.method === 'sim') ? (
+                  <button
+                    type="button"
+                    className="chip"
+                    style={{ fontSize: 11, cursor: 'pointer' }}
+                    title={fx.result ? t('competitions.cockpit.reroll') : t('competitions.cockpit.sim')}
+                    onClick={() => run(simFixtureAction(refFor(fx)))}
+                  >
+                    🎲
+                  </button>
+                ) : null}
                 {payload && !isPublished && payload.score[0] !== payload.score[1] && isKnockout ? (
                   <button
                     type="button"
