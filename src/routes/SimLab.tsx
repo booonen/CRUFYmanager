@@ -24,6 +24,8 @@ export function SimLabRoute() {
   const [ratingB, setRatingB] = useState(14);
   const [max, setMax] = useState(30);
   const [runs, setRuns] = useState(1000);
+  const [styleA, setStyleA] = useState(0);
+  const [styleB, setStyleB] = useState(0);
   const [knockout, setKnockout] = useState(false);
   const [result, setResult] = useState<LabResult | null>(null);
 
@@ -36,7 +38,15 @@ export function SimLabRoute() {
     const stamp = Date.now();
     for (let i = 0; i < runs; i++) {
       const out = simulateMatch(
-        { homeRating: ratingA, awayRating: ratingB, ratingMax: Math.max(1, max), params, knockout },
+        {
+          homeRating: ratingA,
+          awayRating: ratingB,
+          homeStyle: styleA,
+          awayStyle: styleB,
+          ratingMax: Math.max(1, max),
+          params,
+          knockout,
+        },
         `lab-${stamp}-${i}`,
       );
       goals += out.home + out.away;
@@ -71,6 +81,14 @@ export function SimLabRoute() {
           <div className="field">
             <label className="field__label">{t('simlab.max')}</label>
             <NumberInput className="input" style={{ width: 90 }} value={max} min={1} max={9999} step={0.01} allowFloat onCommit={setMax} />
+          </div>
+          <div className="field">
+            <label className="field__label">{t('simlab.styleA')}</label>
+            <NumberInput className="input" style={{ width: 90 }} value={styleA} min={-5} max={5} step={0.01} allowFloat onCommit={setStyleA} />
+          </div>
+          <div className="field">
+            <label className="field__label">{t('simlab.styleB')}</label>
+            <NumberInput className="input" style={{ width: 90 }} value={styleB} min={-5} max={5} step={0.01} allowFloat onCommit={setStyleB} />
           </div>
           <div className="field">
             <label className="field__label">{t('simlab.runs')}</label>

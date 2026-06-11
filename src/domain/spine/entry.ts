@@ -27,4 +27,10 @@ export interface Entry {
   participant: ParticipantRef;
   seeding: EntrySeeding;
   bonus: BonusEntry[];
+  /**
+   * Style modifier, −5…+5 (decimals fine). The two sides' mods combine to
+   * shift goal *volume* only — a +5 pair turns 2–1 into something like 5–4,
+   * a −5 pair into 1–0. Winner and goal difference are never affected.
+   */
+  styleMod: number;
 }

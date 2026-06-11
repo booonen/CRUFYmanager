@@ -28,6 +28,9 @@ export function eventRatingMax(event: SportEvent): number {
 export interface SimMatchInput {
   homeRating: number; // effective: seeding + bonus
   awayRating: number;
+  /** Style modifiers (−5…+5 each); their sum shifts goal volume, never winner/GD. */
+  homeStyle: number;
+  awayStyle: number;
   ratingMax: number;
   params: SimParams;
   knockout: boolean; // sims must resolve: ET then shootout
@@ -65,6 +68,25 @@ function shootout(input: SimMatchInput, rng: Rng): [number, number] {
   return [home, away];
 }
 
+/**
+ * Combined style shifts both scores by the same amount (goal volume only):
+ * positive style adds mutual goals, negative removes them — capped so the
+ * loser never drops below zero. Winner and GD are untouched by construction.
+ */
+function applyStyle(input: SimMatchInput, rng: Rng, home: number, away: number): [number, number] {
+  const combined = input.homeStyle + input.awayStyle;
+  const impact = Math.max(0, input.params.styleImpact);
+  if (combined > 0) {
+    const extra = poisson(rng, combined * impact);
+    return [home + extra, away + extra];
+  }
+  if (combined < 0) {
+    const removed = Math.min(Math.min(home, away), poisson(rng, -combined * impact));
+    return [home - removed, away - removed];
+  }
+  return [home, away];
+}
+
 /** Pure, fully seeded outcome sim. Same seed + same inputs ⇒ same output. */
 export function simulateMatch(input: SimMatchInput, seed: string): SimMatchOutput {
   const rng = makeRng(seed);
@@ -74,6 +96,7 @@ export function simulateMatch(input: SimMatchInput, seed: string): SimMatchOutpu
   let away = poisson(rng, lambdaTotal * (1 - share));
 
   if (!input.knockout || home !== away) {
+    [home, away] = applyStyle(input, rng, home, away);
     return { home, away, decidedBy: 'regulation', shootout: null };
   }
 
@@ -83,8 +106,10 @@ export function simulateMatch(input: SimMatchInput, seed: string): SimMatchOutpu
   home += etHome;
   away += etAway;
   if (home !== away) {
+    [home, away] = applyStyle(input, rng, home, away);
     return { home, away, decidedBy: 'extra-time', shootout: null };
   }
+  [home, away] = applyStyle(input, rng, home, away);
   return { home, away, decidedBy: 'shootout', shootout: shootout(input, rng) };
 }
 
@@ -97,12 +122,15 @@ export function simInputsDigest(input: SimMatchInput): string {
     ENGINE_VERSION,
     input.homeRating,
     input.awayRating,
+    input.homeStyle,
+    input.awayStyle,
     input.ratingMax,
     input.knockout ? 'ko' : 'rr',
     input.params.goalsPerMatch,
     input.params.chaos,
     input.params.favoritism,
     input.params.homeEdge,
+    input.params.styleImpact,
   ].join('|');
   let h = 5381;
   for (let i = 0; i < s.length; i++) {

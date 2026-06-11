@@ -14,6 +14,7 @@ import {
   publishRound,
   removeBonus,
   renameRound,
+  setEntryStyle,
   setEventRatingMax,
   setManualTieOrder,
   setRoundMatchday,
@@ -152,6 +153,10 @@ export function importBonusAction(
 
 export function setRatingMaxAction(ref: EventRef, value: number | null): SpineActionResult {
   return mutateSpine((sf) => setEventRatingMax(sf, ref, value));
+}
+
+export function setEntryStyleAction(ref: EventRef, entryId: string, styleMod: number): SpineActionResult {
+  return mutateSpine((sf) => setEntryStyle(sf, ref, entryId, styleMod));
 }
 
 export function updateSimParams(patch: Partial<import('../domain/scorination').SimParams>): void {

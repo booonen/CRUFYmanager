@@ -37,18 +37,19 @@ function parsePastedEntries(text: string): EntryInput[] {
     const name = parts[0] ?? '';
     if (!name) continue;
     let code = '';
-    let rating: number | null = null;
+    const numbers: number[] = [];
     for (const part of parts.slice(1)) {
       const n = Number(part);
       if (part !== '' && Number.isFinite(n)) {
-        rating = n;
+        numbers.push(n);
       } else if (part) {
         code = part;
       }
     }
     out.push({
       participant: { kind: 'ad-hoc', name, shortCode: (code || codeOf(name)).toUpperCase().slice(0, 5) },
-      seeding: rating ?? 0,
+      seeding: numbers[0] ?? 0,
+      styleMod: Math.max(-5, Math.min(5, numbers[1] ?? 0)),
     });
   }
   return out;
@@ -393,7 +394,7 @@ export function CompetitionWizard({ open, sf, onClose, onCreated }: CompetitionW
               rows={10}
               value={pasteText}
               autoFocus
-              placeholder={'Qusmo, QUS, 28.54\nBrixton Hill, BRX, 27.01\nAppleton'}
+              placeholder={'Qusmo, QUS, 28.54, -2.13\nBrixton Hill, BRX, 27.01, 1.5\nAppleton'}
               onChange={(e) => setPasteText(e.target.value)}
             />
             <div className="field__hint">{t('competitions.wizard.entriesHint')}</div>

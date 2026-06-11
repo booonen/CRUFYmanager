@@ -26,6 +26,10 @@ function normalizeBaseline(savefile: Savefile): Savefile {
   if (!scorination || !scorination.sim) {
     scorination = { sim: { ...DEFAULT_SCORINATION.sim } };
     touched = true;
+  } else {
+    const merged = { ...DEFAULT_SCORINATION.sim, ...scorination.sim };
+    if (Object.keys(merged).some((k) => !(k in scorination.sim))) touched = true;
+    scorination = { ...scorination, sim: merged };
   }
   const competitions = savefile.competitions.map((comp) => {
     let md = 1;
@@ -41,7 +45,7 @@ function normalizeBaseline(savefile: Savefile): Savefile {
           0,
           ...legacy.filter((e) => oldOf(e).mode === 'rank').map((e) => oldOf(e).value),
         );
-        const entries =
+        let entries =
           legacy.length === 0
             ? event.entries
             : event.entries.map((e) => {
@@ -50,6 +54,10 @@ function normalizeBaseline(savefile: Savefile): Savefile {
                 return { ...e, seeding: old.mode === 'rank' ? maxRank + 1 - old.value : old.value };
               });
         if (legacy.length > 0) touched = true;
+        if (entries.some((e) => (e as { styleMod?: number }).styleMod === undefined)) {
+          touched = true;
+          entries = entries.map((e) => ({ ...e, styleMod: (e as { styleMod?: number }).styleMod ?? 0 }));
+        }
 
         const stages = event.stages.map((stage) => ({
           ...stage,

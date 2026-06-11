@@ -269,6 +269,8 @@ export function simInputForFixture(sf: Savefile, ref: FixtureRef): SimMatchInput
   return {
     homeRating: home.seeding + bonusAt(home, md),
     awayRating: away.seeding + bonusAt(away, md),
+    homeStyle: home.styleMod,
+    awayStyle: away.styleMod,
     ratingMax: eventRatingMax(event),
     params: sf.scorination.sim,
     knockout: stage.format.kind === 'knockout' || stage.format.kind === 'single-match',
@@ -376,6 +378,16 @@ export function importBonusValues(
     current = upsertBonus(current, ref, row.entryId, { matchday, value: row.value, note: '' });
   }
   return current;
+}
+
+export function setEntryStyle(sf: Savefile, ref: EventRef, entryId: string, styleMod: number): Savefile {
+  if (styleMod < -5 || styleMod > 5) {
+    throw new SpineGuardError('style modifier must be between −5 and +5');
+  }
+  return mapEvent(sf, ref, (ev) => ({
+    ...ev,
+    entries: ev.entries.map((entry): Entry => (entry.id === entryId ? { ...entry, styleMod } : entry)),
+  }));
 }
 
 export function setEventRatingMax(sf: Savefile, ref: EventRef, value: number | null): Savefile {

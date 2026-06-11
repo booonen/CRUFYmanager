@@ -14,6 +14,8 @@ import { adHocEntries, getComp, refFor, setUp } from './testkit';
 const input = (over?: Partial<SimMatchInput>): SimMatchInput => ({
   homeRating: 15,
   awayRating: 15,
+  homeStyle: 0,
+  awayStyle: 0,
   ratingMax: 30,
   params: { ...DEFAULT_SIM_PARAMS },
   knockout: false,
@@ -94,12 +96,58 @@ describe('scale invariance (zero-anchored)', () => {
   });
 });
 
+describe('style modifiers (volume only, never winner/GD)', () => {
+  it('same seed: any style combination preserves winner and goal difference', () => {
+    for (let i = 0; i < 120; i++) {
+      const seed = `style-${i}`;
+      const base = simulateMatch(input({ homeRating: 19, awayRating: 13 }), seed);
+      const spicy = simulateMatch(input({ homeRating: 19, awayRating: 13, homeStyle: 5, awayStyle: 4 }), seed);
+      const drab = simulateMatch(input({ homeRating: 19, awayRating: 13, homeStyle: -5, awayStyle: -4 }), seed);
+      expect(spicy.home - spicy.away).toBe(base.home - base.away);
+      expect(drab.home - drab.away).toBe(base.home - base.away);
+      expect(Math.min(spicy.home, spicy.away)).toBeGreaterThanOrEqual(0);
+      expect(Math.min(drab.home, drab.away)).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('positive style inflates goal volume, negative deflates it', () => {
+    let spicyGoals = 0;
+    let baseGoals = 0;
+    let drabGoals = 0;
+    for (let i = 0; i < 600; i++) {
+      const seed = `vol-${i}`;
+      const b = simulateMatch(input(), seed);
+      const s2 = simulateMatch(input({ homeStyle: 5, awayStyle: 5 }), seed);
+      const d = simulateMatch(input({ homeStyle: -5, awayStyle: -5 }), seed);
+      baseGoals += b.home + b.away;
+      spicyGoals += s2.home + s2.away;
+      drabGoals += d.home + d.away;
+    }
+    expect(spicyGoals).toBeGreaterThan(baseGoals + 600); // ≳1 extra goal per match
+    expect(drabGoals).toBeLessThan(baseGoals);
+  });
+
+  it('zero combined style changes nothing at all', () => {
+    for (let i = 0; i < 60; i++) {
+      const seed = `zero-${i}`;
+      expect(simulateMatch(input({ homeStyle: 2.5, awayStyle: -2.5 }), seed)).toEqual(
+        simulateMatch(input(), seed),
+      );
+    }
+  });
+
+  it('style feeds the inputs digest', () => {
+    expect(simInputsDigest(input({ homeStyle: 1 }))).not.toBe(simInputsDigest(input()));
+  });
+});
+
 describe('bonus ledger semantics', () => {
   const entry = (bonus: { matchday: number | null; value: number }[]) => ({
     id: 'e1',
     participant: { kind: 'ad-hoc' as const, name: 'X', shortCode: 'X' },
     seeding: 10,
     bonus: bonus.map((b, i) => ({ id: `b${i}`, matchday: b.matchday, value: b.value, note: '' })),
+    styleMod: 0,
   });
 
   it('latest value with matchday ≤ at wins; null is the baseline', () => {

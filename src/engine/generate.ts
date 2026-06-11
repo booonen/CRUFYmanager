@@ -21,6 +21,7 @@ import { generateRoundRobin } from './roundrobin';
 export interface EntryInput {
   participant: ParticipantRef;
   seeding: EntrySeeding;
+  styleMod?: number;
 }
 
 export type CompetitionPreset =
@@ -356,6 +357,7 @@ export function createCompetitionFromSpec(spec: CompetitionSpec): Competition {
     participant: input.participant,
     seeding: input.seeding,
     bonus: [],
+    styleMod: input.styleMod ?? 0,
   }));
   const orderedIds = orderEntriesBySeeding(entries).map((e) => e.id);
 

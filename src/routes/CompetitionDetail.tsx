@@ -11,7 +11,7 @@ import type { Savefile } from '../domain/savefile';
 import type { Competition, SportEvent } from '../domain/spine';
 import { bonusAt, eventRatingMax } from '../engine/simulate';
 import { t } from '../lang';
-import { setEntrySeeding, setRatingMaxAction, useCompetition } from '../stores/competitions';
+import { setEntrySeeding, setEntryStyleAction, setRatingMaxAction, useCompetition } from '../stores/competitions';
 import { useSavefileStore } from '../stores/savefile';
 import { entryDisplay } from '../utils/participants';
 
@@ -141,6 +141,7 @@ function EntriesPanel({ sf, competition, event }: { sf: Savefile; competition: C
             <th>{t('competitions.cockpit.entryCode')}</th>
             <th>{t('competitions.cockpit.entryName')}</th>
             <th>{t('competitions.cockpit.entrySeed')}</th>
+            <th title={t('competitions.cockpit.styleHint')}>{t('competitions.cockpit.styleCol')}</th>
             <th>{t('competitions.cockpit.bonusCol')}</th>
             <th>{t('competitions.cockpit.effCol')}</th>
             <th />
@@ -164,6 +165,19 @@ function EntriesPanel({ sf, competition, event }: { sf: Savefile; competition: C
                     step={0.01}
                     allowFloat
                     onCommit={(value) => setEntrySeeding(eventRef, entry.id, value)}
+                  />
+                </td>
+                <td style={{ width: 90 }}>
+                  <NumberInput
+                    className="input"
+                    style={{ width: 68, padding: '2px 6px', fontSize: 12 }}
+                    value={entry.styleMod}
+                    min={-5}
+                    max={5}
+                    step={0.01}
+                    allowFloat
+                    title={t('competitions.cockpit.styleHint')}
+                    onCommit={(value) => setEntryStyleAction(eventRef, entry.id, value)}
                   />
                 </td>
                 <td className="mono" style={{ color: bonus !== 0 ? 'var(--accent)' : 'var(--text-muted)' }}>

@@ -12,6 +12,8 @@ export interface SimParams {
   favoritism: number;
   /** Home advantage as a fraction of the rating scale (0 = neutral venues). */
   homeEdge: number;
+  /** Mutual goals added/removed per point of combined style mod (volume only). */
+  styleImpact: number;
 }
 
 export interface ScorinationSettings {
@@ -23,6 +25,7 @@ export const DEFAULT_SIM_PARAMS: SimParams = {
   chaos: 0.1,
   favoritism: 4.5,
   homeEdge: 0,
+  styleImpact: 0.35,
 };
 
 export const DEFAULT_SCORINATION: ScorinationSettings = {

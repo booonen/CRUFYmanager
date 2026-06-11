@@ -42,6 +42,7 @@ export function ScorinationSettingsModal({ open, params, onClose }: ScorinationS
         {field('chaos', t('competitions.cockpit.chaosLabel'), 0, 1)}
         {field('favoritism', t('competitions.cockpit.favoritismLabel'), 0.5, 12)}
         {field('homeEdge', t('competitions.cockpit.homeEdgeLabel'), -0.5, 0.5)}
+        {field('styleImpact', t('competitions.cockpit.styleImpactLabel'), 0, 2)}
       </div>
     </Modal>
   );
