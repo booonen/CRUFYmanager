@@ -384,6 +384,13 @@ Implementation landed on `claude/affectionate-heisenberg-9bln2f` (commit `2e89e8
 
 **Outstanding before the phase closes:** re-verify the §6 gate checklist (now including the calendar flow) on the deployed Pages site, then merge + this log's final entry.
 
+### Phase 3 — implemented 2026-06-10, gate verification pending · proposal: [`docs/phases/phase-3.md`](docs/phases/phase-3.md)
+Question round (proposal §8) reshaped §5 of this plan — **§8 supersedes §5.1–§5.3 where they conflict**:
+- **Zero-anchored rating scale**: gaps are `(effA − effB) / ratingMax`, `ratingMax` per event (host-provided or highest seeding). No class-gap or rank-curve concepts.
+- **Bonus values are host-computed** — grading systems are out of scope. The ledger stores plain rating-unit values per matchday (latest ≤ the round's matchday applies); bulk import per matchday is the primary path. The grading-config/normalization design (old §5.2) is deleted; the invariance guarantee became *rating*-scale invariance (ratings+bonus+max scaled together ⇒ identical results per seed) and ships in CI.
+- **U-model detail gating**: no players ⇒ no player simming. Match detail (scorers etc.) waits for squad-backed entries; sims emit scorelines (+ ET/pens).
+- Shipped (commit `40a4e08`): seeded outcome engine with per-save SimParams, ET/shootout resolution, replay/re-roll with drift detection, bonus ledger + import UI, scorination settings, Sim Lab, 11 calibration/invariance tests (94 total green). The reference spreadsheet remains owed — model comparison happens when the user supplies its formulas.
+
 ### Replan — 2026-06-10 (this document)
 - User brief reframed CRUFY around the NS scorinator workflow; question round ratified the four decisions in §1 (lock-on-publish; scale-agnostic additive Bonus; per-savefile randomness with fresh stored seeds; all four sport families eventually, taxonomy baked in now).
 - `CRUFY_PLAN_2.md` becomes canonical; plan 1 marked superseded.
