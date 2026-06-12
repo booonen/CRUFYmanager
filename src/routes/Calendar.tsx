@@ -1,4 +1,4 @@
-import { useMemo, useState, type DragEvent } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type DragEvent, type RefObject } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
@@ -20,7 +20,54 @@ import { useSavefileStore } from '../stores/savefile';
 import { SPORT_ICON } from '../utils/sport';
 
 const DRAG_MIME = 'application/x-crufy-round';
-const PAGE_SIZE = 24;
+
+// Viewport-adaptive paging: as many whole cells as fit without a scrollbar.
+const MIN_CELL_W = 330; // matches .cal-grid minmax
+const CELL_H = 197; // .cal-cell min-height + borders
+const GRID_GAP = 10;
+const RESERVED_BELOW = 120; // unscheduled tray + breathing room
+const FALLBACK_PAGE_SIZE = 24; // unmeasurable environments (e.g. jsdom)
+
+interface CalendarLayout {
+  cols: number; // 0 = unmeasured, let CSS auto-fill decide
+  pageSize: number;
+}
+
+function useCalendarLayout(gridRef: RefObject<HTMLDivElement | null>, active: boolean): CalendarLayout {
+  const [layout, setLayout] = useState<CalendarLayout>({ cols: 0, pageSize: FALLBACK_PAGE_SIZE });
+
+  useLayoutEffect(() => {
+    if (!active) return;
+    const el = gridRef.current;
+    if (!el) return;
+    const measure = () => {
+      const width = el.clientWidth;
+      if (width < MIN_CELL_W) {
+        setLayout((prev) =>
+          prev.cols === 0 && prev.pageSize === FALLBACK_PAGE_SIZE
+            ? prev
+            : { cols: 0, pageSize: FALLBACK_PAGE_SIZE },
+        );
+        return;
+      }
+      const cols = Math.max(1, Math.floor((width + GRID_GAP) / (MIN_CELL_W + GRID_GAP)));
+      const available = window.innerHeight - el.getBoundingClientRect().top - RESERVED_BELOW;
+      const rows = Math.max(1, Math.floor((available + GRID_GAP) / (CELL_H + GRID_GAP)));
+      const pageSize = cols * rows;
+      setLayout((prev) => (prev.cols === cols && prev.pageSize === pageSize ? prev : { cols, pageSize }));
+    };
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [gridRef, active]);
+
+  return layout;
+}
 
 function dragPayload(entry: CalendarSlotEntry): string {
   const ref: RoundRef = {
@@ -88,6 +135,8 @@ export function CalendarRoute() {
   const [dropTarget, setDropTarget] = useState<number | 'tray' | null>(null);
   const [page, setPage] = useState<number | null>(null); // null = follow current matchday
   const [actionError, setActionError] = useState<string | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const { cols, pageSize } = useCalendarLayout(gridRef, status === 'ready' && savefile !== null);
 
   const index = useMemo(
     () => (savefile ? matchdayIndex(savefile) : new Map<number, CalendarSlotEntry[]>()),
@@ -112,11 +161,11 @@ export function CalendarRoute() {
   }
 
   const calendar = savefile.calendar;
-  const totalPages = Math.max(1, Math.ceil(calendar.matchdaysPerSeason / PAGE_SIZE));
-  const pageOf = (md: number) => Math.floor((md - 1) / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(calendar.matchdaysPerSeason / pageSize));
+  const pageOf = (md: number) => Math.floor((md - 1) / pageSize);
   const activePage = Math.min(page ?? pageOf(calendar.currentMatchday), totalPages - 1);
-  const firstMd = activePage * PAGE_SIZE + 1;
-  const lastMd = Math.min(firstMd + PAGE_SIZE - 1, calendar.matchdaysPerSeason);
+  const firstMd = activePage * pageSize + 1;
+  const lastMd = Math.min(firstMd + pageSize - 1, calendar.matchdaysPerSeason);
   const days = Array.from({ length: lastMd - firstMd + 1 }, (_, i) => firstMd + i);
 
   const atSeasonEnd = calendar.currentMatchday >= calendar.matchdaysPerSeason;
@@ -204,7 +253,11 @@ export function CalendarRoute() {
         </div>
       ) : null}
 
-      <div className="cal-grid">
+      <div
+        className="cal-grid"
+        ref={gridRef}
+        style={cols > 0 ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : undefined}
+      >
         {days.map((md) => {
           const entries = index.get(md) ?? [];
           const isCurrent = md === calendar.currentMatchday;
